@@ -1,6 +1,6 @@
 import { createServer } from "node:http"
-import type { IntegrationOAuthMethodRegistration } from "@opencode-ai/plugin/v2/effect/integration"
-import { define } from "@opencode-ai/plugin/v2/effect/plugin"
+import type { IntegrationOAuthMethodRegistration } from "@crewcode/plugin/v2/effect/integration"
+import { define } from "@crewcode/plugin/v2/effect/plugin"
 import { Deferred, Effect } from "effect"
 import type { Scope } from "effect"
 import { Credential } from "../../credential"
@@ -37,7 +37,7 @@ type Claims = {
 }
 
 const browser = {
-  integrationID: Integration.ID.make("openai"),
+  integrationID: Integration.ID.make("openai-codex"),
   method: {
     id: browserMethodID,
     type: "oauth",
@@ -94,7 +94,7 @@ const browser = {
 } satisfies IntegrationOAuthMethodRegistration
 
 const headless = {
-  integrationID: Integration.ID.make("openai"),
+  integrationID: Integration.ID.make("openai-codex"),
   method: {
     id: headlessMethodID,
     type: "oauth",
@@ -181,7 +181,7 @@ export const OpenAIPlugin = define({
     )
     yield* ctx.aisdk.language(
       Effect.fn(function* (evt) {
-        if (evt.model.providerID !== ProviderV2.ID.openai) return
+        if (evt.model.providerID !== ProviderV2.ID.openai && evt.model.providerID !== ProviderV2.ID.openaiCodex) return
         evt.language = evt.sdk.responses(evt.model.api.id)
       }),
     )
@@ -189,7 +189,7 @@ export const OpenAIPlugin = define({
 } satisfies PluginInternal.Plugin<PluginInternal.Requirements | Scope.Scope>)
 
 function headers(contentType: string) {
-  return { "Content-Type": contentType, "User-Agent": `opencode/${InstallationVersion}` }
+  return { "Content-Type": contentType, "User-Agent": `crewcode/${InstallationVersion}` }
 }
 
 function exchange(code: string, redirect: string, pkce: Pkce) {
@@ -268,7 +268,7 @@ function authorizeURL(redirect: string, pkce: Pkce, state: string) {
     id_token_add_organizations: "true",
     codex_cli_simplified_flow: "true",
     state,
-    originator: "opencode",
+    originator: "crewcode",
   })}`
 }
 

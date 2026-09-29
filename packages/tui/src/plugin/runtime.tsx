@@ -1,9 +1,7 @@
 import type {
   TuiPluginApi,
-  TuiPluginInstallOptions,
-  TuiPluginInstallResult,
   TuiPluginStatus,
-} from "@opencode-ai/plugin/tui"
+} from "@crewcode/plugin/tui"
 import type { TuiConfig } from "../config"
 import { createContext, createSignal, useContext, type JSX, type ParentProps } from "solid-js"
 import { createPluginRoutes } from "./api"
@@ -38,7 +36,6 @@ export type PluginRuntimeCommands = {
   activate: (id: string) => Promise<boolean>
   deactivate: (id: string) => Promise<boolean>
   add: (spec: string) => Promise<boolean>
-  install: (spec: string, options?: TuiPluginInstallOptions) => Promise<TuiPluginInstallResult>
 }
 
 const emptyCommands: PluginRuntimeCommands = {
@@ -50,9 +47,6 @@ const emptyCommands: PluginRuntimeCommands = {
   },
   async add() {
     return false
-  },
-  async install() {
-    return { ok: false, message: "Plugin runtime is not available." }
   },
 }
 

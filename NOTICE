@@ -1,0 +1,31 @@
+CrewCode
+========
+
+CrewCode is a hard fork of OpenCode (https://github.com/anomalyco/opencode),
+taken at commit 8d05153965bee0a1e46eccffe944dc84d0b0c6f1 (2026-09-28).
+
+OpenCode is licensed under the MIT License, Copyright (c) 2025 opencode.
+The full text is in the LICENSE file and applies to the code derived from
+OpenCode. Changes made in CrewCode are distributed under the same terms.
+This notice and the LICENSE file must be kept in every copy of the software.
+
+Third-party material
+--------------------
+
+Model catalog data (packages/core/src/catalog/models-snapshot.json)
+  Generated from https://models.dev, MIT License, Copyright (c) 2025 models.dev.
+  The source, date and SHA-256 of each snapshot are in models-snapshot.meta.json.
+
+Tree-sitter grammars and highlight queries (packages/tui/src/assets/parsers)
+  Each grammar keeps its own license. The list, the license of each one and its
+  text are in packages/tui/src/assets/parsers/NOTICE.
+
+Other bundled packages keep the licenses they were published with. See the
+LICENSE files inside packages/ and the metadata of each dependency.
+
+Acknowledgments
+---------------
+
+The permission reviewer was designed after reading three OpenCode plugins:
+opencode-auto-permissions (MIT), opencode-permission-reviewer (Apache-2.0) and
+opencode-permission-gate (MIT). No code from them was copied.

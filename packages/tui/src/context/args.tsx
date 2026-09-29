@@ -7,7 +7,8 @@ export interface Args {
   continue?: boolean
   sessionID?: string
   fork?: boolean
-  auto?: boolean
+  /** Approval mode the server was started with, for display only: the server makes the decisions. */
+  approval?: string
 }
 
 export const { use: useArgs, provider: ArgsProvider } = createSimpleContext({

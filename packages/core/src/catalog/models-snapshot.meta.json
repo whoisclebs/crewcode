@@ -1,0 +1,10 @@
+{
+  "source": "https://models.dev/api.json",
+  "fetched_at": "2026-09-29T00:08:19.205Z",
+  "source_sha256": "4bbe6c44a311bb8e632f87cdf1160a3f19412e4ef8d13a0280536e8930dac9b7",
+  "models": {
+    "openai": 52,
+    "openai-codex": 10,
+    "openrouter": 385
+  }
+}

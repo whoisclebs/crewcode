@@ -1,290 +1,106 @@
-import { describe, expect, beforeAll, beforeEach, afterAll } from "bun:test"
-import { Effect, Layer, Ref } from "effect"
-import { HttpClient, HttpClientResponse } from "effect/unstable/http"
-import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
-import { LayerNodePlatform } from "@opencode-ai/core/effect/app-node-platform"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
-import { Flag } from "@opencode-ai/core/flag/flag"
-import { Global } from "@opencode-ai/core/global"
-import { ModelsDev } from "@opencode-ai/core/models-dev"
+import { describe, expect, beforeAll, afterAll } from "bun:test"
+import { Effect, Layer } from "effect"
+import { AppNodeBuilder } from "@crewcode/core/effect/app-node-builder"
+import { Flag } from "@crewcode/core/flag/flag"
+import { ModelsDev } from "@crewcode/core/models-dev"
+import { ProviderAllowlist } from "@crewcode/core/provider-allowlist"
 import { it } from "./lib/effect"
-import { readFile, rm, writeFile, utimes, mkdir } from "fs/promises"
+import { mkdtemp, rm, writeFile } from "fs/promises"
+import os from "os"
 import path from "path"
 
-// test/preload.ts pins OPENCODE_MODELS_PATH to a fixture so other tests can
-// resolve providers without network. These tests need to drive the on-disk
-// cache themselves and silence the eager refresh fork. Save/restore around
-// the suite — never leak the mutation to subsequent test files in the same
-// bun process.
-const ORIGINAL_MODELS_PATH = Flag.OPENCODE_MODELS_PATH
-const ORIGINAL_DISABLE_FETCH = Flag.OPENCODE_DISABLE_MODELS_FETCH
-beforeAll(() => {
-  Flag.OPENCODE_MODELS_PATH = undefined
-  Flag.OPENCODE_DISABLE_MODELS_FETCH = true
-})
+// test/preload.ts pins CREWCODE_MODELS_PATH to a fixture so other tests can resolve providers offline.
+// These tests drive the catalog source themselves, so save and restore around the suite.
+const ORIGINAL_MODELS_PATH = Flag.CREWCODE_MODELS_PATH
 afterAll(() => {
-  Flag.OPENCODE_MODELS_PATH = ORIGINAL_MODELS_PATH
-  Flag.OPENCODE_DISABLE_MODELS_FETCH = ORIGINAL_DISABLE_FETCH
+  Flag.CREWCODE_MODELS_PATH = ORIGINAL_MODELS_PATH
 })
 
-const cacheFile = path.join(Global.Path.cache, "models.json")
-
-const fixture: Record<string, ModelsDev.Provider> = {
-  acme: {
-    id: "acme",
-    name: "Acme",
-    env: ["ACME_API_KEY"],
-    models: {
-      "acme-1": {
-        id: "acme-1",
-        name: "Acme One",
-        release_date: "2026-01-01",
-        attachment: false,
-        reasoning: false,
-        temperature: true,
-        tool_call: true,
-        limit: { context: 128000, output: 8192 },
-      },
-    },
-  },
-}
-
-const fixture2: Record<string, ModelsDev.Provider> = {
-  beta: {
-    id: "beta",
-    name: "Beta",
-    env: ["BETA_API_KEY"],
-    models: {
-      "beta-1": {
-        id: "beta-1",
-        name: "Beta One",
-        release_date: "2026-02-01",
-        attachment: false,
-        reasoning: true,
-        temperature: false,
-        tool_call: false,
-        limit: { context: 64000, output: 4096 },
-      },
-    },
-  },
-}
-
-interface MockState {
-  body: string
-  status: number
-  calls: Array<{ url: string; userAgent: string | null }>
-}
-
-const makeMockClient = (state: Ref.Ref<MockState>) =>
-  HttpClient.make((request) =>
-    Effect.gen(function* () {
-      yield* Ref.update(state, (s) => ({
-        ...s,
-        calls: [...s.calls, { url: request.url, userAgent: request.headers["user-agent"] ?? null }],
-      }))
-      const s = yield* Ref.get(state)
-      return HttpClientResponse.fromWeb(request, new Response(s.body, { status: s.status }))
-    }),
-  )
-
-const buildLayer = (state: Ref.Ref<MockState>) =>
-  // Layer.fresh is required because the ModelsDev implementation is a module-level Layer constant,
-  // and Effect.provide uses a process-global MemoMap by default — without fresh,
-  // every test would reuse the cachedInvalidateWithTTL state from the first run.
-  Layer.fresh(
-    AppNodeBuilder.build(ModelsDev.node, [
-      [LayerNodePlatform.httpClient, Layer.succeed(HttpClient.HttpClient, makeMockClient(state))],
-    ]),
-  )
-
-const writeCacheText = (text: string, mtimeMs?: number) =>
-  Effect.promise(async () => {
-    await mkdir(Global.Path.cache, { recursive: true })
-    await writeFile(cacheFile, text)
-    if (mtimeMs !== undefined) {
-      const t = mtimeMs / 1000
-      await utimes(cacheFile, t, t)
-    }
-  })
-
-const writeCache = (data: object, mtimeMs?: number) => writeCacheText(JSON.stringify(data), mtimeMs)
-
-const provided = <A, E>(state: Ref.Ref<MockState>, eff: Effect.Effect<A, E, ModelsDev.Service>) =>
-  eff.pipe(Effect.provide(buildLayer(state)))
-
-beforeEach(async () => {
-  await rm(cacheFile, { force: true })
+const model = (id: string, name: string): ModelsDev.Model => ({
+  id,
+  name,
+  release_date: "2026-01-01",
+  attachment: false,
+  reasoning: false,
+  temperature: true,
+  tool_call: true,
+  limit: { context: 128000, output: 8192 },
 })
 
-afterAll(async () => {
-  await rm(cacheFile, { force: true })
+const provider = (id: string, env: string[]): ModelsDev.Provider => ({
+  id,
+  name: id,
+  env,
+  models: { [`${id}-1`]: model(`${id}-1`, `${id} one`) },
 })
 
-const initialState: MockState = {
-  body: JSON.stringify(fixture),
-  status: 200,
-  calls: [],
+const catalogFile = async (data: Record<string, ModelsDev.Provider>) => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "crewcode-models-"))
+  const file = path.join(dir, "models.json")
+  await writeFile(file, JSON.stringify(data))
+  return { dir, file }
 }
+
+// Layer.fresh is required because the ModelsDev implementation is a module-level Layer constant and Effect.provide
+// uses a process-global MemoMap by default; without fresh every test would reuse the cached catalog of the first run.
+const get = () => ModelsDev.Service.use((service) => service.get()).pipe(Effect.provide(Layer.fresh(AppNodeBuilder.build(ModelsDev.node))))
 
 describe("ModelsDev Service", () => {
-  it.live("get() returns providers from disk when cache file exists", () =>
+  it.live("get() reads the local catalog file and keeps only allowed providers", () =>
     Effect.gen(function* () {
-      yield* writeCache(fixture)
-      const state = yield* Ref.make(initialState)
-      const result = yield* provided(
-        state,
-        ModelsDev.Service.use((s) => s.get()),
+      const { dir, file } = yield* Effect.promise(() =>
+        catalogFile({
+          openrouter: provider("openrouter", ["OPENROUTER_API_KEY"]),
+          openai: provider("openai", ["OPENAI_API_KEY"]),
+          anthropic: provider("anthropic", ["ANTHROPIC_API_KEY"]),
+          crewcode: provider("crewcode", ["CREWCODE_API_KEY"]),
+        }),
       )
-      expect(result).toEqual(fixture)
-      const final = yield* Ref.get(state)
-      expect(final.calls).toEqual([])
+      Flag.CREWCODE_MODELS_PATH = file
+      const result = yield* get().pipe(Effect.ensuring(Effect.promise(() => rm(dir, { recursive: true, force: true }))))
+      expect(Object.keys(result).sort()).toEqual(["openai", "openrouter"])
+      expect(result.openai.models["openai-1"].name).toBe("openai one")
     }),
   )
 
-  it.live("get() returns empty catalog when disk empty, fetch disabled, and no bundled snapshot is injected", () =>
+  it.live("get() falls back to the bundled snapshot with exactly the allowed providers", () =>
     Effect.gen(function* () {
-      const state = yield* Ref.make(initialState)
-      const result = yield* provided(
-        state,
-        ModelsDev.Service.use((s) => s.get()),
-      )
+      Flag.CREWCODE_MODELS_PATH = undefined
+      const result = yield* get()
+      expect(Object.keys(result).sort()).toEqual([...ProviderAllowlist.ids].sort())
+      for (const id of ProviderAllowlist.ids) expect(Object.keys(result[id].models).length).toBeGreaterThan(0)
+    }),
+  )
+
+  it.live("bundled snapshot models the OAuth Codex flow separately from the API key flow", () =>
+    Effect.gen(function* () {
+      Flag.CREWCODE_MODELS_PATH = undefined
+      const result = yield* get()
+      expect(result["openai"].env).toEqual(["OPENAI_API_KEY"])
+      expect(result["openai-codex"].env).toEqual([])
+      expect(result["openai-codex"].id).toBe("openai-codex")
+    }),
+  )
+
+  it.live("get() is single-flight and cached under concurrent calls", () =>
+    Effect.gen(function* () {
+      Flag.CREWCODE_MODELS_PATH = undefined
+      const results = yield* Effect.gen(function* () {
+        const service = yield* ModelsDev.Service
+        return yield* Effect.all([service.get(), service.get(), service.get()], { concurrency: "unbounded" })
+      }).pipe(Effect.provide(Layer.fresh(AppNodeBuilder.build(ModelsDev.node))))
+      expect(results[1]).toBe(results[0])
+      expect(results[2]).toBe(results[0])
+    }),
+  )
+
+  it.live("get() returns an empty catalog when the local file is missing or invalid, without touching the network", () =>
+    Effect.gen(function* () {
+      const { dir, file } = yield* Effect.promise(() => catalogFile({}))
+      yield* Effect.promise(() => writeFile(file, "{"))
+      Flag.CREWCODE_MODELS_PATH = file
+      const result = yield* get().pipe(Effect.ensuring(Effect.promise(() => rm(dir, { recursive: true, force: true }))))
       expect(result).toEqual({})
-      const final = yield* Ref.get(state)
-      expect(final.calls).toEqual([])
-    }),
-  )
-
-  it.live("get() recovers from a corrupted cache file by fetching a fresh catalog", () =>
-    Effect.gen(function* () {
-      yield* writeCacheText("{")
-      const state = yield* Ref.make({ ...initialState, body: JSON.stringify(fixture2) })
-      const context = yield* Layer.build(buildLayer(state))
-      const result = yield* Effect.acquireUseRelease(
-        Effect.sync(() => {
-          Flag.OPENCODE_DISABLE_MODELS_FETCH = false
-        }),
-        () => ModelsDev.Service.use((s) => s.get()).pipe(Effect.provide(context)),
-        () =>
-          Effect.sync(() => {
-            Flag.OPENCODE_DISABLE_MODELS_FETCH = true
-          }),
-      )
-      expect(result).toEqual(fixture2)
-      expect(yield* Effect.promise(() => readFile(cacheFile, "utf8"))).toBe(JSON.stringify(fixture2))
-      const final = yield* Ref.get(state)
-      expect(final.calls.length).toBe(1)
-    }),
-  )
-
-  it.live("get() is single-flight under concurrent calls", () =>
-    Effect.gen(function* () {
-      yield* writeCache(fixture)
-      const state = yield* Ref.make(initialState)
-      const results = yield* provided(
-        state,
-        Effect.gen(function* () {
-          const svc = yield* ModelsDev.Service
-          return yield* Effect.all([svc.get(), svc.get(), svc.get(), svc.get(), svc.get()], {
-            concurrency: "unbounded",
-          })
-        }),
-      )
-      for (const result of results) expect(result).toEqual(fixture)
-    }),
-  )
-
-  it.live("get() caches across calls (later disk writes are ignored until invalidate)", () =>
-    Effect.gen(function* () {
-      yield* writeCache(fixture)
-      const state = yield* Ref.make(initialState)
-      const first = yield* provided(
-        state,
-        Effect.gen(function* () {
-          const svc = yield* ModelsDev.Service
-          const a = yield* svc.get()
-          // mutate disk between calls — cache should mask the change
-          yield* writeCache(fixture2)
-          const b = yield* svc.get()
-          return { a, b }
-        }),
-      )
-      expect(first.a).toEqual(fixture)
-      expect(first.b).toEqual(fixture)
-    }),
-  )
-
-  it.live("refresh(true) fetches via HttpClient and updates the cache", () =>
-    Effect.gen(function* () {
-      yield* writeCache(fixture)
-      const state = yield* Ref.make({ ...initialState, body: JSON.stringify(fixture2) })
-      const result = yield* provided(
-        state,
-        Effect.gen(function* () {
-          const svc = yield* ModelsDev.Service
-          const before = yield* svc.get()
-          yield* svc.refresh(true)
-          const after = yield* svc.get()
-          return { before, after }
-        }),
-      )
-      expect(result.before).toEqual(fixture)
-      expect(result.after).toEqual(fixture2)
-      const final = yield* Ref.get(state)
-      expect(final.calls.length).toBe(1)
-      expect(final.calls[0].url).toContain("/api.json")
-      expect(final.calls[0].userAgent).toContain("/cli")
-    }),
-  )
-
-  it.live("refresh(false) skips fetch when on-disk file is fresh", () =>
-    Effect.gen(function* () {
-      // Fresh: mtime within the 5-minute TTL.
-      yield* writeCache(fixture, Date.now() - 1000)
-      const state = yield* Ref.make({ ...initialState, body: JSON.stringify(fixture2) })
-      yield* provided(
-        state,
-        ModelsDev.Service.use((s) => s.refresh(false)),
-      )
-      const final = yield* Ref.get(state)
-      expect(final.calls).toEqual([])
-    }),
-  )
-
-  it.live("refresh(false) fetches when on-disk file is stale", () =>
-    Effect.gen(function* () {
-      // Stale: mtime 10 minutes ago, beyond the 5-minute TTL.
-      yield* writeCache(fixture, Date.now() - 10 * 60 * 1000)
-      const state = yield* Ref.make({ ...initialState, body: JSON.stringify(fixture2) })
-      const after = yield* provided(
-        state,
-        Effect.gen(function* () {
-          const svc = yield* ModelsDev.Service
-          yield* svc.refresh(false)
-          return yield* svc.get()
-        }),
-      )
-      const final = yield* Ref.get(state)
-      expect(final.calls.length).toBe(1)
-      expect(after).toEqual(fixture2)
-    }),
-  )
-
-  it.live("refresh swallows HTTP errors and leaves cache intact", () =>
-    Effect.gen(function* () {
-      yield* writeCache(fixture)
-      const state = yield* Ref.make({ ...initialState, status: 500, body: "boom" })
-      const result = yield* provided(
-        state,
-        Effect.gen(function* () {
-          const svc = yield* ModelsDev.Service
-          yield* svc.refresh(true)
-          return yield* svc.get()
-        }),
-      )
-      expect(result).toEqual(fixture)
-      // retryTransient retries 5xx, so calls may be > 1.
-      const final = yield* Ref.get(state)
-      expect(final.calls.length).toBeGreaterThanOrEqual(1)
     }),
   )
 })

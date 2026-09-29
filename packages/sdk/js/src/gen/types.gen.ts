@@ -7,20 +7,6 @@ export type EventServerInstanceDisposed = {
   }
 }
 
-export type EventInstallationUpdated = {
-  type: "installation.updated"
-  properties: {
-    version: string
-  }
-}
-
-export type EventInstallationUpdateAvailable = {
-  type: "installation.update-available"
-  properties: {
-    version: string
-  }
-}
-
 export type EventLspClientDiagnostics = {
   type: "lsp.client.diagnostics"
   properties: {
@@ -541,9 +527,6 @@ export type Session = {
     files: number
     diffs?: Array<FileDiff>
   }
-  share?: {
-    url: string
-  }
   title: string
   version: string
   time: {
@@ -625,7 +608,6 @@ export type EventTuiCommandExecute = {
       | (
           | "session.list"
           | "session.new"
-          | "session.share"
           | "session.interrupt"
           | "session.compact"
           | "session.page.up"
@@ -703,8 +685,6 @@ export type EventServerConnected = {
 
 export type Event =
   | EventServerInstanceDisposed
-  | EventInstallationUpdated
-  | EventInstallationUpdateAvailable
   | EventLspClientDiagnostics
   | EventLspUpdated
   | EventMessageUpdated
@@ -818,14 +798,6 @@ export type KeybindsConfig = {
    * Show session timeline
    */
   session_timeline?: string
-  /**
-   * Share current session
-   */
-  session_share?: string
-  /**
-   * Unshare current session
-   */
-  session_unshare?: string
   /**
    * Interrupt current session
    */
@@ -1209,7 +1181,7 @@ export type Config = {
     diff_style?: "auto" | "stacked"
   }
   /**
-   * Command configuration, see https://opencode.ai/docs/commands
+   * Command configuration, see https://crewcode.ai/docs/commands
    */
   command?: {
     [key: string]: {
@@ -1225,18 +1197,6 @@ export type Config = {
   }
   plugin?: Array<string>
   snapshot?: boolean
-  /**
-   * Control sharing behavior:'manual' allows manual sharing via commands, 'auto' enables automatic sharing, 'disabled' disables all sharing
-   */
-  share?: "manual" | "auto" | "disabled"
-  /**
-   * @deprecated Use 'share' field instead. Share newly created sessions automatically
-   */
-  autoshare?: boolean
-  /**
-   * Automatically update to the latest version. Set to true to auto-update, false to disable, or 'notify' to show update notifications
-   */
-  autoupdate?: boolean | "notify"
   /**
    * Disable providers that are loaded automatically
    */
@@ -1266,7 +1226,7 @@ export type Config = {
     [key: string]: AgentConfig | undefined
   }
   /**
-   * Agent configuration, see https://opencode.ai/docs/agent
+   * Agent configuration, see https://crewcode.ai/docs/agent
    */
   agent?: {
     plan?: AgentConfig
@@ -1336,12 +1296,6 @@ export type Config = {
   }
   tools?: {
     [key: string]: boolean
-  }
-  enterprise?: {
-    /**
-     * Enterprise URL
-     */
-    url?: string
   }
   experimental?: {
     hook?: {
@@ -1671,13 +1625,7 @@ export type ApiAuth = {
   }
 }
 
-export type WellKnownAuth = {
-  type: "wellknown"
-  key: string
-  token: string
-}
-
-export type Auth = OAuth | ApiAuth | WellKnownAuth
+export type Auth = OAuth | ApiAuth
 
 export type GlobalEventData = {
   body?: never
@@ -2402,72 +2350,6 @@ export type SessionAbortResponses = {
 }
 
 export type SessionAbortResponse = SessionAbortResponses[keyof SessionAbortResponses]
-
-export type SessionUnshareData = {
-  body?: never
-  path: {
-    id: string
-  }
-  query?: {
-    directory?: string
-  }
-  url: "/session/{id}/share"
-}
-
-export type SessionUnshareErrors = {
-  /**
-   * Bad request
-   */
-  400: BadRequestError
-  /**
-   * Not found
-   */
-  404: NotFoundError
-}
-
-export type SessionUnshareError = SessionUnshareErrors[keyof SessionUnshareErrors]
-
-export type SessionUnshareResponses = {
-  /**
-   * Successfully unshared session
-   */
-  200: Session
-}
-
-export type SessionUnshareResponse = SessionUnshareResponses[keyof SessionUnshareResponses]
-
-export type SessionShareData = {
-  body?: never
-  path: {
-    id: string
-  }
-  query?: {
-    directory?: string
-  }
-  url: "/session/{id}/share"
-}
-
-export type SessionShareErrors = {
-  /**
-   * Bad request
-   */
-  400: BadRequestError
-  /**
-   * Not found
-   */
-  404: NotFoundError
-}
-
-export type SessionShareError = SessionShareErrors[keyof SessionShareErrors]
-
-export type SessionShareResponses = {
-  /**
-   * Successfully shared session
-   */
-  200: Session
-}
-
-export type SessionShareResponse = SessionShareResponses[keyof SessionShareResponses]
 
 export type SessionDiffData = {
   body?: never

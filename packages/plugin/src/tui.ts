@@ -1,6 +1,6 @@
 import type {
   AgentPart,
-  OpencodeClient,
+  CrewcodeClient,
   Event,
   FilePart,
   LspStatus,
@@ -15,7 +15,7 @@ import type {
   SessionStatus,
   TextPart,
   Config as SdkConfig,
-} from "@opencode-ai/sdk/v2"
+} from "@crewcode/sdk/v2"
 import type { CliRenderer, KeyEvent, RGBA, Renderable, SlotMode } from "@opentui/core"
 import type { Binding, Keymap } from "@opentui/keymap"
 import {
@@ -475,7 +475,6 @@ export type TuiHostSlotMap = {
   sidebar_title: {
     session_id: string
     title: string
-    share_url?: string
   }
   sidebar_content: {
     session_id: string
@@ -557,22 +556,6 @@ export type TuiPluginStatus = {
   active: boolean
 }
 
-export type TuiPluginInstallOptions = {
-  global?: boolean
-}
-
-export type TuiPluginInstallResult =
-  | {
-      ok: true
-      dir: string
-      tui: boolean
-    }
-  | {
-      ok: false
-      message: string
-      missing?: boolean
-    }
-
 export type TuiWorkspace = {
   current: () => string | undefined
   set: (workspaceID?: string) => void
@@ -611,7 +594,7 @@ export type TuiPluginApi = {
   kv: TuiKV
   state: TuiState
   theme: TuiTheme
-  client: OpencodeClient
+  client: CrewcodeClient
   event: TuiEventBus
   renderer: CliRenderer
   slots: TuiSlots
@@ -620,7 +603,6 @@ export type TuiPluginApi = {
     activate: (id: string) => Promise<boolean>
     deactivate: (id: string) => Promise<boolean>
     add: (spec: string) => Promise<boolean>
-    install: (spec: string, options?: TuiPluginInstallOptions) => Promise<TuiPluginInstallResult>
   }
   lifecycle: TuiLifecycle
 }

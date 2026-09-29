@@ -2,7 +2,7 @@ export * as Ripgrep from "./ripgrep"
 
 import { Context, Effect, Fiber, Layer, Schema, Stream } from "effect"
 import { ChildProcess } from "effect/unstable/process"
-import { Entry, Match } from "@opencode-ai/schema/filesystem"
+import { Entry, Match } from "@crewcode/schema/filesystem"
 import { makeGlobalNode } from "./effect/app-node"
 import { AppProcess, collectStream, waitForAbort } from "./process"
 import { NonNegativeInt, PositiveInt, RelativePath } from "./schema"
@@ -82,7 +82,7 @@ export interface Interface {
   readonly grep: (input: GrepInput) => Effect.Effect<readonly Match[], Error | InvalidPatternError>
 }
 
-export class Service extends Context.Service<Service, Interface>()("@opencode/v2/Ripgrep") {}
+export class Service extends Context.Service<Service, Interface>()("@crewcode/v2/Ripgrep") {}
 
 const failure = (message: string, cause?: unknown) => new Error({ message, cause })
 
@@ -143,11 +143,11 @@ const layer = Layer.effect(
       )
       const abortable = input.signal ? program.pipe(Effect.raceFirst(waitForAbort(input.signal))) : program
       return abortable.pipe(
-        Effect.mapError((cause) =>
-          cause instanceof Error || cause instanceof InvalidPatternError
-            ? cause
-            : failure("ripgrep execution failed", cause),
-        ),
+        Effect.mapError((cause) => {
+          if (cause instanceof Error || cause instanceof InvalidPatternError) return cause
+          if (cause instanceof RipgrepBinary.NotFoundError) return failure(cause.message, cause)
+          return failure("ripgrep execution failed", cause)
+        }),
       )
     }
 

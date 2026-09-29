@@ -26,9 +26,6 @@ test("facade publishes and clears presentation state", async () => {
       async add() {
         return true
       },
-      async install() {
-        return { ok: true, dir: "/tmp", tui: true }
-      },
     },
     status: [
       {

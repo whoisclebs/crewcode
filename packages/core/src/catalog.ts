@@ -2,7 +2,7 @@ export * as Catalog from "./catalog"
 
 import { makeLocationNode } from "./effect/app-node"
 import { Array, Context, Effect, Layer, Option, Order, pipe, Schema } from "effect"
-import { Catalog } from "@opencode-ai/schema/catalog"
+import { Catalog } from "@crewcode/schema/catalog"
 import { ModelV2 } from "./model"
 import { ProviderV2 } from "./provider"
 import { EventV2 } from "./event"
@@ -59,7 +59,7 @@ export interface Interface extends State.Transformable<Draft> {
   }
 }
 
-export class Service extends Context.Service<Service, Interface>()("@opencode/v2/Catalog") {}
+export class Service extends Context.Service<Service, Interface>()("@crewcode/v2/Catalog") {}
 
 const layer = Layer.effect(
   Service,
@@ -235,16 +235,6 @@ const layer = Layer.effect(
           const record = state.get().providers.get(providerID)
           if (!record) return
           const provider = record.provider
-
-          // TODO: Remove these provider-specific assumptions once model syncing reliably reports available deployments.
-          if (providerID === ProviderV2.ID.azure || providerID === ProviderV2.ID.make("azure-cognitive-services")) {
-            return
-          }
-
-          if (providerID === ProviderV2.ID.opencode) {
-            const gpt5Nano = record.models.get(ModelV2.ID.make("gpt-5-nano"))
-            if (gpt5Nano?.enabled && gpt5Nano.status === "active") return projectModel(gpt5Nano, provider)
-          }
 
           const candidates = pipe(
             Array.fromIterable(record.models.values()),

@@ -1,29 +1,29 @@
 import { describe, expect } from "bun:test"
 import path from "path"
 import { Effect, Layer, Stream } from "effect"
-import { AgentV2 } from "@opencode-ai/core/agent"
+import { AgentV2 } from "@crewcode/core/agent"
 import { asc, eq } from "drizzle-orm"
-import { Database } from "@opencode-ai/core/database/database"
-import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
-import { EventV2 } from "@opencode-ai/core/event"
-import { EventTable } from "@opencode-ai/core/event/sql"
-import { Location } from "@opencode-ai/core/location"
-import { ModelV2 } from "@opencode-ai/core/model"
-import { ProjectV2 } from "@opencode-ai/core/project"
-import { ProjectTable } from "@opencode-ai/core/project/sql"
-import { ProviderV2 } from "@opencode-ai/core/provider"
-import { AbsolutePath } from "@opencode-ai/core/schema"
-import { SessionV2 } from "@opencode-ai/core/session"
-import { SessionV1 } from "@opencode-ai/core/v1/session"
-import { Prompt } from "@opencode-ai/core/session/prompt"
-import { SessionProjector } from "@opencode-ai/core/session/projector"
-import { SessionExecution } from "@opencode-ai/core/session/execution"
-import { SessionInput } from "@opencode-ai/core/session/input"
-import { SessionEvent } from "@opencode-ai/core/session/event"
-import { SessionTable } from "@opencode-ai/core/session/sql"
-import { SessionStore } from "@opencode-ai/core/session/store"
-import { WorkspaceV2 } from "@opencode-ai/core/workspace"
+import { Database } from "@crewcode/core/database/database"
+import { AppNodeBuilder } from "@crewcode/core/effect/app-node-builder"
+import { LayerNode } from "@crewcode/core/effect/layer-node"
+import { EventV2 } from "@crewcode/core/event"
+import { EventTable } from "@crewcode/core/event/sql"
+import { Location } from "@crewcode/core/location"
+import { ModelV2 } from "@crewcode/core/model"
+import { ProjectV2 } from "@crewcode/core/project"
+import { ProjectTable } from "@crewcode/core/project/sql"
+import { ProviderV2 } from "@crewcode/core/provider"
+import { AbsolutePath } from "@crewcode/core/schema"
+import { SessionV2 } from "@crewcode/core/session"
+import { SessionV1 } from "@crewcode/core/v1/session"
+import { Prompt } from "@crewcode/core/session/prompt"
+import { SessionProjector } from "@crewcode/core/session/projector"
+import { SessionExecution } from "@crewcode/core/session/execution"
+import { SessionInput } from "@crewcode/core/session/input"
+import { SessionEvent } from "@crewcode/core/session/event"
+import { SessionTable } from "@crewcode/core/session/sql"
+import { SessionStore } from "@crewcode/core/session/store"
+import { WorkspaceV2 } from "@crewcode/core/workspace"
 import { testEffect } from "./lib/effect"
 import { tmpdir } from "./fixture/tmpdir"
 
@@ -79,7 +79,7 @@ describe("SessionV2.create", () => {
       const workspaceID = WorkspaceV2.ID.make("wrk_test")
       const model = ModelV2.Ref.make({
         id: ModelV2.ID.make("sonnet"),
-        providerID: ProviderV2.ID.anthropic,
+        providerID: ProviderV2.ID.openrouter,
         variant: ModelV2.VariantID.make("fast"),
       })
 
@@ -103,7 +103,7 @@ describe("SessionV2.create", () => {
         {
           id,
           location,
-          model: ModelV2.Ref.make({ id: ModelV2.ID.make("sonnet"), providerID: ProviderV2.ID.anthropic }),
+          model: ModelV2.Ref.make({ id: ModelV2.ID.make("sonnet"), providerID: ProviderV2.ID.openrouter }),
         },
       ]
 
@@ -356,7 +356,7 @@ describe("SessionV2.create", () => {
       const created = yield* session.create({ location })
       const model = ModelV2.Ref.make({
         id: ModelV2.ID.make("sonnet"),
-        providerID: ProviderV2.ID.anthropic,
+        providerID: ProviderV2.ID.openrouter,
         variant: ModelV2.VariantID.make("high"),
       })
 
@@ -373,7 +373,7 @@ describe("SessionV2.create", () => {
     Effect.gen(function* () {
       const session = yield* SessionV2.Service
       const created = yield* session.create({ location })
-      const model = ModelV2.Ref.make({ id: ModelV2.ID.make("sonnet"), providerID: ProviderV2.ID.anthropic })
+      const model = ModelV2.Ref.make({ id: ModelV2.ID.make("sonnet"), providerID: ProviderV2.ID.openrouter })
 
       yield* session.switchModel({ sessionID: created.id, model })
       yield* session.switchModel({ sessionID: created.id, model })
@@ -389,7 +389,7 @@ describe("SessionV2.create", () => {
   it.effect("treats an omitted variant as the default variant", () =>
     Effect.gen(function* () {
       const session = yield* SessionV2.Service
-      const model = ModelV2.Ref.make({ id: ModelV2.ID.make("sonnet"), providerID: ProviderV2.ID.anthropic })
+      const model = ModelV2.Ref.make({ id: ModelV2.ID.make("sonnet"), providerID: ProviderV2.ID.openrouter })
       const created = yield* session.create({ location, model })
 
       yield* session.switchModel({
@@ -413,7 +413,7 @@ describe("SessionV2.create", () => {
         yield* session
           .switchModel({
             sessionID: missing,
-            model: ModelV2.Ref.make({ id: ModelV2.ID.make("sonnet"), providerID: ProviderV2.ID.anthropic }),
+            model: ModelV2.Ref.make({ id: ModelV2.ID.make("sonnet"), providerID: ProviderV2.ID.openrouter }),
           })
           .pipe(
             Effect.flip,

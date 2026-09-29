@@ -1,14 +1,14 @@
-import { AISDK } from "@opencode-ai/core/aisdk"
+import { AISDK } from "@crewcode/core/aisdk"
 import { describe, expect } from "bun:test"
 import type { LanguageModelV3 } from "@ai-sdk/provider"
 import { Effect } from "effect"
-import { Catalog } from "@opencode-ai/core/catalog"
-import { Integration } from "@opencode-ai/core/integration"
-import { ModelV2 } from "@opencode-ai/core/model"
-import { PluginV2 } from "@opencode-ai/core/plugin"
-import { PluginHost } from "@opencode-ai/core/plugin/host"
-import { OpenAIPlugin } from "@opencode-ai/core/plugin/provider/openai"
-import { ProviderV2 } from "@opencode-ai/core/provider"
+import { Catalog } from "@crewcode/core/catalog"
+import { Integration } from "@crewcode/core/integration"
+import { ModelV2 } from "@crewcode/core/model"
+import { PluginV2 } from "@crewcode/core/plugin"
+import { PluginHost } from "@crewcode/core/plugin/host"
+import { OpenAIPlugin } from "@crewcode/core/plugin/provider/openai"
+import { ProviderV2 } from "@crewcode/core/provider"
 import { testEffect } from "../lib/effect"
 import { PluginTestLayer } from "./fixture"
 
@@ -44,7 +44,7 @@ describe("OpenAIPlugin", () => {
   it.effect("registers browser and headless ChatGPT OAuth methods", () =>
     Effect.gen(function* () {
       yield* addPlugin()
-      expect((yield* (yield* Integration.Service).get(Integration.ID.make("openai")))?.methods).toEqual([
+      expect((yield* (yield* Integration.Service).get(Integration.ID.make("openai-codex")))?.methods).toEqual([
         {
           id: Integration.MethodID.make("chatgpt-browser"),
           type: "oauth",
@@ -120,7 +120,7 @@ describe("OpenAIPlugin", () => {
       yield* addPlugin()
       const result = yield* aisdk.runLanguage({
         model: ModelV2.Info.make({
-          ...ModelV2.Info.empty(ProviderV2.ID.anthropic, ModelV2.ID.make("gpt-5")),
+          ...ModelV2.Info.empty(ProviderV2.ID.openrouter, ModelV2.ID.make("gpt-5")),
           api: { id: ModelV2.ID.make("gpt-5"), type: "aisdk", package: "test-provider" },
         }),
         sdk: fakeSelectorSdk(calls),

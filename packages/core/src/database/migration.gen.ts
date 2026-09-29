@@ -40,5 +40,7 @@ export const migrations = (
     import("./migration/20260622142730_simplify_session_context_epoch"),
     import("./migration/20260622170816_reset_v2_session_state"),
     import("./migration/20260622202450_simplify_session_input"),
+    import("./migration/20260929002931_drop_session_share"),
+    import("./migration/20260929003638_drop_account_tables"),
   ])
 ).map((module) => module.default) satisfies DatabaseMigration.Migration[]

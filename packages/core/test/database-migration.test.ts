@@ -3,32 +3,32 @@ import { $ } from "bun"
 import { fileURLToPath } from "url"
 import path from "path"
 import { SqliteClient } from "@effect/sql-sqlite-bun"
-import { EffectDrizzleSqlite } from "@opencode-ai/effect-drizzle-sqlite"
+import { EffectDrizzleSqlite } from "@crewcode/effect-drizzle-sqlite"
 import { Effect, Layer } from "effect"
 import { eq, inArray, sql } from "drizzle-orm"
-import { DatabaseMigration } from "@opencode-ai/core/database/migration"
-import { migrations } from "@opencode-ai/core/database/migration.gen"
-import workspaceNameMigration from "@opencode-ai/core/database/migration/20260410174513_workspace-name"
-import sessionUsageMigration from "@opencode-ai/core/database/migration/20260510033149_session_usage"
-import normalizeStoragePathsMigration from "@opencode-ai/core/database/migration/20260601010001_normalize_storage_paths"
-import sessionMessageProjectionOrderMigration from "@opencode-ai/core/database/migration/20260603040000_session_message_projection_order"
-import eventSourcedSessionInputMigration from "@opencode-ai/core/database/migration/20260604172448_event_sourced_session_input"
-import contextEpochAgentMigration from "@opencode-ai/core/database/migration/20260605042240_add_context_epoch_agent"
-import simplifyIntegrationCredentialsMigration from "@opencode-ai/core/database/migration/20260611192811_lush_chimera"
-import simplifySessionInputMigration from "@opencode-ai/core/database/migration/20260622202450_simplify_session_input"
-import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
-import { EventV2 } from "@opencode-ai/core/event"
-import { ProjectV2 } from "@opencode-ai/core/project"
-import { ProjectTable } from "@opencode-ai/core/project/sql"
-import { AbsolutePath } from "@opencode-ai/core/schema"
-import { SessionSchema } from "@opencode-ai/core/session/schema"
-import { SessionTable } from "@opencode-ai/core/session/sql"
-import sessionMetadataMigration from "@opencode-ai/core/database/migration/20260511173437_session-metadata"
+import { DatabaseMigration } from "@crewcode/core/database/migration"
+import { migrations } from "@crewcode/core/database/migration.gen"
+import workspaceNameMigration from "@crewcode/core/database/migration/20260410174513_workspace-name"
+import sessionUsageMigration from "@crewcode/core/database/migration/20260510033149_session_usage"
+import normalizeStoragePathsMigration from "@crewcode/core/database/migration/20260601010001_normalize_storage_paths"
+import sessionMessageProjectionOrderMigration from "@crewcode/core/database/migration/20260603040000_session_message_projection_order"
+import eventSourcedSessionInputMigration from "@crewcode/core/database/migration/20260604172448_event_sourced_session_input"
+import contextEpochAgentMigration from "@crewcode/core/database/migration/20260605042240_add_context_epoch_agent"
+import simplifyIntegrationCredentialsMigration from "@crewcode/core/database/migration/20260611192811_lush_chimera"
+import simplifySessionInputMigration from "@crewcode/core/database/migration/20260622202450_simplify_session_input"
+import { AppNodeBuilder } from "@crewcode/core/effect/app-node-builder"
+import { LayerNode } from "@crewcode/core/effect/layer-node"
+import { EventV2 } from "@crewcode/core/event"
+import { ProjectV2 } from "@crewcode/core/project"
+import { ProjectTable } from "@crewcode/core/project/sql"
+import { AbsolutePath } from "@crewcode/core/schema"
+import { SessionSchema } from "@crewcode/core/session/schema"
+import { SessionTable } from "@crewcode/core/session/sql"
+import sessionMetadataMigration from "@crewcode/core/database/migration/20260511173437_session-metadata"
 import type { SqlClient as SqlClientService } from "effect/unstable/sql/SqlClient"
-import { Database } from "@opencode-ai/core/database/database"
-import { SessionProjector } from "@opencode-ai/core/session/projector"
-import { SessionV1 } from "@opencode-ai/core/v1/session"
+import { Database } from "@crewcode/core/database/database"
+import { SessionProjector } from "@crewcode/core/session/projector"
+import { SessionV1 } from "@crewcode/core/v1/session"
 import { tmpdir } from "./fixture/tmpdir"
 
 const run = <A, E>(effect: Effect.Effect<A, E, SqlClientService>) =>
@@ -39,6 +39,90 @@ const run = <A, E>(effect: Effect.Effect<A, E, SqlClientService>) =>
 const makeDb = EffectDrizzleSqlite.makeWithDefaults()
 
 describe("DatabaseMigration", () => {
+  test("drops the session share table and column while keeping existing sessions", async () => {
+    const migration = migrations.find((item) => item.id.endsWith("_drop_session_share"))
+    expect(migration).toBeDefined()
+    await run(
+      Effect.gen(function* () {
+        const db = yield* makeDb
+        yield* DatabaseMigration.applyOnly(db, migrations.slice(0, migrations.indexOf(migration!)))
+        yield* db.run(sql`PRAGMA foreign_keys = OFF`)
+
+        const columns = (yield* db.all(sql`PRAGMA table_info(session)`)) as {
+          name: string
+          type: string
+          notnull: number
+          dflt_value: string | null
+          pk: number
+        }[]
+        const required = columns.filter((column) => column.pk > 0 || (column.notnull && column.dflt_value === null))
+        const value = (column: { name: string; type: string }) =>
+          column.name === "id" ? "'ses_kept'" : column.type.toLowerCase().includes("int") ? "1" : `'${column.name}_value'`
+        yield* db.run(
+          sql.raw(
+            `INSERT INTO session (${required.map((column) => column.name).join(", ")}) VALUES (${required.map(value).join(", ")})`,
+          ),
+        )
+        yield* db.run(sql`UPDATE session SET share_url = 'https://share.example/abc' WHERE id = 'ses_kept'`)
+        expect(yield* db.get(sql`SELECT name FROM sqlite_master WHERE name = 'session_share'`)).toBeDefined()
+
+        yield* DatabaseMigration.applyOnly(db, [migration!])
+
+        expect(yield* db.get(sql`SELECT id FROM session WHERE id = 'ses_kept'`)).toEqual({ id: "ses_kept" })
+        expect(yield* db.get(sql`SELECT name FROM sqlite_master WHERE name = 'session_share'`)).toBeUndefined()
+        const after = (yield* db.all(sql`PRAGMA table_info(session)`)) as { name: string }[]
+        expect(after.map((column) => column.name)).not.toContain("share_url")
+      }),
+    )
+  })
+
+  test("drops the account tables while keeping existing sessions", async () => {
+    const migration = migrations.find((item) => item.id.endsWith("_drop_account_tables"))
+    expect(migration).toBeDefined()
+    await run(
+      Effect.gen(function* () {
+        const db = yield* makeDb
+        yield* DatabaseMigration.applyOnly(db, migrations.slice(0, migrations.indexOf(migration!)))
+        yield* db.run(sql`PRAGMA foreign_keys = OFF`)
+
+        const columns = (yield* db.all(sql`PRAGMA table_info(session)`)) as {
+          name: string
+          type: string
+          notnull: number
+          dflt_value: string | null
+          pk: number
+        }[]
+        const required = columns.filter((column) => column.pk > 0 || (column.notnull && column.dflt_value === null))
+        const value = (column: { name: string; type: string }) =>
+          column.name === "id" ? "'ses_kept'" : column.type.toLowerCase().includes("int") ? "1" : `'${column.name}_value'`
+        yield* db.run(
+          sql.raw(
+            `INSERT INTO session (${required.map((column) => column.name).join(", ")}) VALUES (${required.map(value).join(", ")})`,
+          ),
+        )
+        yield* db.run(sql`
+          INSERT INTO account (id, email, url, access_token, refresh_token, time_created, time_updated)
+          VALUES ('acc_1', 'user@example.com', 'https://console.example', 'access', 'refresh', 1, 1)
+        `)
+        yield* db.run(sql`INSERT INTO account_state (id, active_account_id) VALUES (1, 'acc_1')`)
+        yield* db.run(sql`
+          INSERT INTO control_account (email, url, access_token, refresh_token, active, time_created, time_updated)
+          VALUES ('user@example.com', 'https://console.example', 'access', 'refresh', 1, 1, 1)
+        `)
+        for (const table of ["account", "account_state", "control_account"]) {
+          expect(yield* db.get(sql.raw(`SELECT name FROM sqlite_master WHERE name = '${table}'`))).toBeDefined()
+        }
+
+        yield* DatabaseMigration.applyOnly(db, [migration!])
+
+        expect(yield* db.get(sql`SELECT id FROM session WHERE id = 'ses_kept'`)).toEqual({ id: "ses_kept" })
+        for (const table of ["account", "account_state", "control_account"]) {
+          expect(yield* db.get(sql.raw(`SELECT name FROM sqlite_master WHERE name = '${table}'`))).toBeUndefined()
+        }
+      }),
+    )
+  })
+
   test("defaults missing workspace names while preserving legacy workspace data", async () => {
     await run(
       Effect.gen(function* () {

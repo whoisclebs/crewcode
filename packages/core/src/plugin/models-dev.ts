@@ -1,7 +1,6 @@
 import { define } from "./internal"
-import type { ModelV2Info } from "@opencode-ai/sdk/v2/types"
-import { Effect, Stream } from "effect"
-import { EventV2 } from "../event"
+import type { ModelV2Info } from "@crewcode/sdk/v2/types"
+import { Effect } from "effect"
 import { ModelsDev } from "../models-dev"
 import { ProviderV2 } from "../provider"
 
@@ -120,7 +119,6 @@ export const ModelsDevPlugin = define({
   id: "models-dev",
   effect: Effect.fn(function* (ctx) {
     const modelsDev = yield* ModelsDev.Service
-    const events = yield* EventV2.Service
     yield* ctx.integration.transform(
       Effect.fn(function* (integrations) {
         const data = yield* modelsDev.get()
@@ -174,10 +172,6 @@ export const ModelsDevPlugin = define({
           }
         }
       }),
-    )
-    yield* events.subscribe(ModelsDev.Event.Refreshed).pipe(
-      Stream.runForEach(() => ctx.integration.reload().pipe(Effect.andThen(ctx.catalog.reload()))),
-      Effect.forkScoped({ startImmediately: true }),
     )
   }),
 })
