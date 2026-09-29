@@ -59,72 +59,6 @@ const openai: Lowerer = {
   },
 }
 
-const anthropic: Lowerer = {
-  provider(options) {
-    return {
-      url: string(options.baseURL),
-      headers: compact({
-        "x-api-key": string(options.apiKey),
-        Authorization: options.authToken ? bearer(options.authToken) : undefined,
-        ...headers(options.headers),
-      }),
-      body: body(options.body),
-      settings: omit(options, ["apiKey", "authToken", "baseURL", "headers", "body"]),
-    }
-  },
-  request(options) {
-    const result = snake(options)
-    if (options.effort !== undefined || options.taskBudget !== undefined) {
-      result.output_config = compactUnknown({ effort: options.effort, task_budget: options.taskBudget })
-      delete result.effort
-      delete result.task_budget
-    }
-    if (isRecord(options.metadata) && options.metadata.userId !== undefined) {
-      result.metadata = { ...(isRecord(result.metadata) ? result.metadata : {}), user_id: options.metadata.userId }
-    }
-    return result
-  },
-}
-
-const google: Lowerer = {
-  provider(options) {
-    return {
-      url: string(options.baseURL),
-      headers: compact({ "x-goog-api-key": string(options.apiKey), ...headers(options.headers) }),
-      body: body(options.body),
-      settings: omit(options, ["apiKey", "baseURL", "headers", "body"]),
-    }
-  },
-  request(options) {
-    const generationConfig = pick(options, ["thinkingConfig", "responseModalities", "mediaResolution", "imageConfig"])
-    return {
-      ...omit(options, ["thinkingConfig", "responseModalities", "mediaResolution", "imageConfig"]),
-      ...(Object.keys(generationConfig).length ? { generationConfig } : {}),
-    }
-  },
-}
-
-const azure: Lowerer = {
-  provider(options) {
-    return {
-      url: string(options.baseURL),
-      headers: compact({ "api-key": string(options.apiKey), ...headers(options.headers) }),
-      body: body(options.body),
-      settings: omit(options, ["apiKey", "baseURL", "headers", "body"]),
-    }
-  },
-  request: openai.request,
-}
-
-const bedrock: Lowerer = {
-  provider(options) {
-    return direct(options)
-  },
-  request(options) {
-    return { additionalModelRequestFields: clone(options) }
-  },
-}
-
 const openaiCompatible: Lowerer = {
   provider(options) {
     return { ...direct(options, ["baseURL"]), url: string(options.baseURL) }
@@ -141,22 +75,8 @@ const openaiCompatible: Lowerer = {
 
 const lowerers: Readonly<Record<string, Lowerer>> = {
   "@ai-sdk/openai": openai,
-  "@ai-sdk/anthropic": anthropic,
-  "@ai-sdk/google-vertex/anthropic": anthropic,
-  "@ai-sdk/google": google,
-  "@ai-sdk/google-vertex": google,
-  "@ai-sdk/azure": azure,
-  "@ai-sdk/amazon-bedrock": bedrock,
   "@ai-sdk/openai-compatible": openaiCompatible,
-  "@ai-sdk/cerebras": openaiCompatible,
-  "@ai-sdk/deepinfra": openaiCompatible,
-  "@ai-sdk/groq": openaiCompatible,
-  "@ai-sdk/mistral": openaiCompatible,
-  "@ai-sdk/togetherai": openaiCompatible,
-  "@ai-sdk/xai": openaiCompatible,
   "@openrouter/ai-sdk-provider": openaiCompatible,
-  "ai-gateway-provider": openaiCompatible,
-  "venice-ai-sdk-provider": openaiCompatible,
 }
 
 function direct(options: Options, extraKeys: ReadonlyArray<string> = []): ProviderResult {
@@ -194,10 +114,6 @@ function omit(options: Options, keys: ReadonlyArray<string>) {
   return Object.fromEntries(Object.entries(options).filter(([key]) => !keys.includes(key)))
 }
 
-function pick(options: Options, keys: ReadonlyArray<string>) {
-  return Object.fromEntries(Object.entries(options).filter(([key]) => keys.includes(key)))
-}
-
 function headers(input: unknown) {
   if (!isRecord(input)) return undefined
   return Object.fromEntries(
@@ -208,10 +124,6 @@ function headers(input: unknown) {
 function compact(input: Record<string, string | undefined>) {
   const entries = Object.entries(input).filter((entry): entry is [string, string] => entry[1] !== undefined)
   return entries.length ? Object.fromEntries(entries) : undefined
-}
-
-function compactUnknown(input: Record<string, unknown>) {
-  return Object.fromEntries(Object.entries(input).filter((entry) => entry[1] !== undefined))
 }
 
 function string(input: unknown) {

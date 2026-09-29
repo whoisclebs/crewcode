@@ -2,7 +2,6 @@ export * as SessionRunnerModel from "./model"
 
 import { makeLocationNode } from "../../effect/app-node"
 import { type Model } from "@crewcode/llm"
-import * as AnthropicMessages from "@crewcode/llm/protocols/anthropic-messages"
 import * as OpenAICompatibleChat from "@crewcode/llm/protocols/openai-compatible-chat"
 import * as OpenAIResponses from "@crewcode/llm/protocols/openai-responses"
 import { Auth, type AnyRoute } from "@crewcode/llm/route"
@@ -146,13 +145,6 @@ export const fromCatalogModel = (
         .model({ id: resolved.api.id }),
     )
   }
-  if (resolved.api.type === "aisdk" && resolved.api.package === "@ai-sdk/anthropic") {
-    return Effect.succeed(
-      withDefaults(resolved, AnthropicMessages.route)
-        .with({ auth: key === undefined ? Auth.none : Auth.header("x-api-key", key) })
-        .model({ id: resolved.api.id }),
-    )
-  }
   if (resolved.api.type === "aisdk" && resolved.api.package === "@ai-sdk/openai-compatible" && resolved.api.url) {
     return Effect.succeed(
       withDefaults(resolved, OpenAICompatibleChat.route)
@@ -175,7 +167,6 @@ export const resolve = (session: SessionSchema.Info, model: ModelV2.Info, creden
 export const supported = (model: ModelV2.Info) =>
   model.api.type === "aisdk" &&
   (model.api.package === "@ai-sdk/openai" ||
-    model.api.package === "@ai-sdk/anthropic" ||
     (model.api.package === "@ai-sdk/openai-compatible" && model.api.url !== undefined))
 
 /** Resolves models from the catalog belonging to the current Location runtime. */

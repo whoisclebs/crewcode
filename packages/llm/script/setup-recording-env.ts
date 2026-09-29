@@ -3,11 +3,9 @@
 import { NodeFileSystem } from "@effect/platform-node"
 import * as path from "node:path"
 import * as prompts from "@clack/prompts"
-import { AwsV4Signer } from "aws4fetch"
 import { Config, ConfigProvider, Effect, FileSystem, PlatformError, Redacted } from "effect"
 import { FetchHttpClient, HttpClient, HttpClientRequest, type HttpClientResponse } from "effect/unstable/http"
 import * as ProviderShared from "../src/protocols/shared"
-import * as Cloudflare from "../src/providers/cloudflare"
 
 type Provider = {
   readonly id: string
@@ -33,46 +31,6 @@ const PROVIDERS: ReadonlyArray<Provider> = [
     note: "Native OpenAI Chat / Responses recorded tests",
     vars: [{ name: "OPENAI_API_KEY" }],
     validate: (env) => validateBearer("https://api.openai.com/v1/models", Redacted.make(env.OPENAI_API_KEY)),
-  },
-  {
-    id: "anthropic",
-    label: "Anthropic",
-    tier: "core",
-    note: "Native Anthropic Messages recorded tests",
-    vars: [{ name: "ANTHROPIC_API_KEY" }],
-    validate: (env) =>
-      HttpClientRequest.get("https://api.anthropic.com/v1/models").pipe(
-        HttpClientRequest.setHeaders({
-          "anthropic-version": "2023-06-01",
-          "x-api-key": Redacted.value(Redacted.make(env.ANTHROPIC_API_KEY)),
-        }),
-        executeRequest,
-      ),
-  },
-  {
-    id: "google",
-    label: "Google Gemini",
-    tier: "core",
-    note: "Native Gemini recorded tests",
-    vars: [{ name: "GOOGLE_GENERATIVE_AI_API_KEY" }],
-    validate: (env) =>
-      HttpClientRequest.get(
-        `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(env.GOOGLE_GENERATIVE_AI_API_KEY)}`,
-      ).pipe(executeRequest),
-  },
-  {
-    id: "bedrock",
-    label: "Amazon Bedrock",
-    tier: "core",
-    note: "Native Bedrock Converse recorded tests",
-    vars: [
-      { name: "AWS_ACCESS_KEY_ID" },
-      { name: "AWS_SECRET_ACCESS_KEY" },
-      { name: "AWS_SESSION_TOKEN", optional: true },
-      { name: "BEDROCK_RECORDING_REGION", optional: true },
-      { name: "BEDROCK_MODEL_ID", optional: true },
-    ],
-    validate: (env) => validateBedrock(env),
   },
   {
     id: "groq",
@@ -102,48 +60,6 @@ const PROVIDERS: ReadonlyArray<Provider> = [
     note: "OpenAI-compatible xAI chat endpoint",
     vars: [{ name: "XAI_API_KEY" }],
     validate: (env) => validateBearer("https://api.x.ai/v1/models", Redacted.make(env.XAI_API_KEY)),
-  },
-  {
-    id: "cloudflare-ai-gateway",
-    label: "Cloudflare AI Gateway",
-    tier: "canary",
-    note: "Cloudflare Unified/OpenAI-compatible gateway; supports provider/model ids like workers-ai/@cf/...",
-    vars: [
-      { name: "CLOUDFLARE_ACCOUNT_ID", label: "Cloudflare account ID", secret: false },
-      {
-        name: "CLOUDFLARE_GATEWAY_ID",
-        label: "Cloudflare AI Gateway ID (defaults to default)",
-        optional: true,
-        secret: false,
-      },
-      { name: "CLOUDFLARE_API_TOKEN", label: "Cloudflare AI Gateway token" },
-    ],
-    validate: (env) =>
-      validateChat({
-        url: `${Cloudflare.aiGatewayBaseURL({
-          accountId: env.CLOUDFLARE_ACCOUNT_ID,
-          gatewayId: env.CLOUDFLARE_GATEWAY_ID || undefined,
-        })}/chat/completions`,
-        token: Redacted.make(envValue(env, Cloudflare.aiGatewayAuthEnvVars)),
-        tokenHeader: "cf-aig-authorization",
-        model: "workers-ai/@cf/meta/llama-3.1-8b-instruct",
-      }),
-  },
-  {
-    id: "cloudflare-workers-ai",
-    label: "Cloudflare Workers AI",
-    tier: "canary",
-    note: "Direct Workers AI OpenAI-compatible endpoint; supports model ids like @cf/meta/...",
-    vars: [
-      { name: "CLOUDFLARE_ACCOUNT_ID", label: "Cloudflare account ID", secret: false },
-      { name: "CLOUDFLARE_API_KEY", label: "Cloudflare Workers AI API token" },
-    ],
-    validate: (env) =>
-      validateChat({
-        url: `${Cloudflare.workersAIBaseURL({ accountId: env.CLOUDFLARE_ACCOUNT_ID })}/chat/completions`,
-        token: Redacted.make(envValue(env, Cloudflare.workersAIAuthEnvVars)),
-        model: "@cf/meta/llama-3.1-8b-instruct",
-      }),
   },
   {
     id: "deepseek",
@@ -346,8 +262,6 @@ const promptVars = (provider: Provider) => provider.vars.filter((item) => !item.
 const processEnv = (): Env =>
   Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined))
 
-const envValue = (env: Env, names: ReadonlyArray<string>) => names.map((name) => env[name]).find(Boolean) ?? ""
-
 const envWithValues = (fileEnv: Env, values: Env): Env => ({
   ...processEnv(),
   ...fileEnv,
@@ -378,13 +292,12 @@ const validateBearer = (url: string, token: Redacted.Redacted<string>, headers: 
 const validateChat = (input: {
   readonly url: string
   readonly token: Redacted.Redacted<string>
-  readonly tokenHeader?: string
   readonly model: string
   readonly headers?: Record<string, string>
 }) =>
   ProviderShared.jsonPost({
     url: input.url,
-    headers: { ...input.headers, [input.tokenHeader ?? "authorization"]: `Bearer ${Redacted.value(input.token)}` },
+    headers: { ...input.headers, authorization: `Bearer ${Redacted.value(input.token)}` },
     body: ProviderShared.encodeJson({
       model: input.model,
       messages: [{ role: "user", content: "Reply with exactly: ok" }],
@@ -392,25 +305,6 @@ const validateChat = (input: {
       temperature: 0,
     }),
   }).pipe(executeRequest)
-
-const validateBedrock = (env: Env) =>
-  Effect.gen(function* () {
-    const request = yield* Effect.promise(() =>
-      new AwsV4Signer({
-        url: `https://bedrock.${env.BEDROCK_RECORDING_REGION || "us-east-1"}.amazonaws.com/foundation-models`,
-        method: "GET",
-        service: "bedrock",
-        region: env.BEDROCK_RECORDING_REGION || "us-east-1",
-        accessKeyId: env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
-        sessionToken: env.AWS_SESSION_TOKEN || undefined,
-      }).sign(),
-    )
-    return yield* HttpClientRequest.get(request.url.toString()).pipe(
-      HttpClientRequest.setHeaders(Object.fromEntries(request.headers.entries())),
-      executeRequest,
-    )
-  })
 
 const validateProvider = Effect.fn("RecordingEnv.validateProvider")(function* (provider: Provider, env: Env) {
   return yield* (provider.validate?.(env) ?? Effect.succeed("no lightweight validator")).pipe(

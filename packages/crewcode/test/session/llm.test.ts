@@ -90,93 +90,6 @@ function llmLayerWithExecutor(
   ])
 }
 
-describe("session.llm.hasToolCalls", () => {
-  test("returns false for empty messages array", () => {
-    expect(LLM.hasToolCalls([])).toBe(false)
-  })
-
-  test("returns false for messages with only text content", () => {
-    const messages: ModelMessage[] = [
-      {
-        role: "user",
-        content: [{ type: "text", text: "Hello" }],
-      },
-      {
-        role: "assistant",
-        content: [{ type: "text", text: "Hi there" }],
-      },
-    ]
-    expect(LLM.hasToolCalls(messages)).toBe(false)
-  })
-
-  test("returns true when messages contain tool-call", () => {
-    const messages = [
-      {
-        role: "user",
-        content: [{ type: "text", text: "Run a command" }],
-      },
-      {
-        role: "assistant",
-        content: [
-          {
-            type: "tool-call",
-            toolCallId: "call-123",
-            toolName: "bash",
-          },
-        ],
-      },
-    ] as ModelMessage[]
-    expect(LLM.hasToolCalls(messages)).toBe(true)
-  })
-
-  test("returns true when messages contain tool-result", () => {
-    const messages = [
-      {
-        role: "tool",
-        content: [
-          {
-            type: "tool-result",
-            toolCallId: "call-123",
-            toolName: "bash",
-          },
-        ],
-      },
-    ] as ModelMessage[]
-    expect(LLM.hasToolCalls(messages)).toBe(true)
-  })
-
-  test("returns false for messages with string content", () => {
-    const messages: ModelMessage[] = [
-      {
-        role: "user",
-        content: "Hello world",
-      },
-      {
-        role: "assistant",
-        content: "Hi there",
-      },
-    ]
-    expect(LLM.hasToolCalls(messages)).toBe(false)
-  })
-
-  test("returns true when tool-call is mixed with text content", () => {
-    const messages = [
-      {
-        role: "assistant",
-        content: [
-          { type: "text", text: "Let me run that command" },
-          {
-            type: "tool-call",
-            toolCallId: "call-456",
-            toolName: "read",
-          },
-        ],
-      },
-    ] as ModelMessage[]
-    expect(LLM.hasToolCalls(messages)).toBe(true)
-  })
-})
-
 describe("session.llm.ai-sdk adapter", () => {
   type AISDKAdapterEvent = Parameters<typeof LLMAISDK.toLLMEvents>[1]
 
@@ -453,110 +366,30 @@ describe("session.llm.ai-sdk adapter", () => {
     ])
   })
 
-  // Anthropic emits cache write counts in providerMetadata.anthropic.cacheCreationInputTokens
-  // rather than usage.inputTokenDetails.cacheWriteTokens. Session.getUsage falls back to the
-  // metadata path — but only if the adapter preserves providerMetadata on step-finish.
-  test("preserves providerMetadata on step-finish so Anthropic cache writes survive getUsage", async () => {
+  test("preserves providerMetadata on step-finish", async () => {
     const events = await adapt([
       {
         type: "finish-step",
-        response: { id: "msg_test", timestamp: new Date(0), modelId: "claude-3-5-sonnet" },
+        response: { id: "gen_test", timestamp: new Date(0), modelId: "openai/gpt-4o-mini" },
         finishReason: "stop",
         rawFinishReason: "stop",
-        // Anthropic's AI SDK shape: cacheWriteTokens is NOT in usage, it arrives via providerMetadata.
         usage: {
           inputTokens: 1000,
           outputTokens: 500,
           totalTokens: 1500,
-          inputTokenDetails: { noCacheTokens: 800, cacheReadTokens: 200, cacheWriteTokens: undefined },
+          inputTokenDetails: { noCacheTokens: 800, cacheReadTokens: 200, cacheWriteTokens: 100 },
           outputTokenDetails: { textTokens: 500, reasoningTokens: undefined },
         },
-        providerMetadata: { anthropic: { cacheCreationInputTokens: 300 } },
+        providerMetadata: { openrouter: { provider: "OpenAI" } },
       },
     ])
 
     expect(events).toHaveLength(1)
     const stepFinish = events[0]
     if (stepFinish.type !== "step-finish") throw new Error("expected step-finish")
-    expect(stepFinish.providerMetadata).toEqual({ anthropic: { cacheCreationInputTokens: 300 } })
-    expect(stepFinish.usage?.cacheWriteInputTokens).toBeUndefined()
+    expect(stepFinish.providerMetadata).toEqual({ openrouter: { provider: "OpenAI" } })
     expect(stepFinish.usage?.cacheReadInputTokens).toBe(200)
-
-    // End-to-end: with the metadata preserved, getUsage extracts cache.write from the fallback path.
-    const result = SessionNs.getUsage({
-      model: {
-        id: "claude-3-5-sonnet",
-        providerID: "anthropic",
-        name: "Claude",
-        limit: { context: 200_000, output: 8_000 },
-        cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
-        capabilities: {
-          toolcall: true,
-          attachment: false,
-          reasoning: false,
-          temperature: true,
-          input: { text: true, image: false, audio: false, video: false },
-          output: { text: true, image: false, audio: false, video: false },
-        },
-        api: { npm: "@ai-sdk/anthropic" },
-        options: {},
-      } as never,
-      usage: stepFinish.usage!,
-      metadata: stepFinish.providerMetadata,
-    })
-    expect(result.tokens.cache.write).toBe(300)
-    expect(result.tokens.cache.read).toBe(200)
-  })
-
-  test("captures Copilot billed usage from raw Anthropic message deltas per step", async () => {
-    const events = await adapt([
-      uncheckedAdapterEvent({
-        type: "raw",
-        rawValue: {
-          type: "message_delta",
-          copilot_usage: { total_nano_aiu: 4_473_525_000 },
-        },
-      }),
-      {
-        type: "finish-step",
-        response: { id: "msg_test", timestamp: new Date(0), modelId: "claude-sonnet-4.6" },
-        finishReason: "stop",
-        rawFinishReason: "end_turn",
-        usage: {
-          inputTokens: 11_774,
-          outputTokens: 39,
-          totalTokens: 11_813,
-          inputTokenDetails: { noCacheTokens: 3, cacheReadTokens: 0, cacheWriteTokens: 11_771 },
-          outputTokenDetails: { textTokens: 39, reasoningTokens: undefined },
-        },
-        providerMetadata: { anthropic: { cacheCreationInputTokens: 11_771 } },
-      },
-      {
-        type: "finish-step",
-        response: { id: "msg_follow_up", timestamp: new Date(0), modelId: "claude-sonnet-4.6" },
-        finishReason: "stop",
-        rawFinishReason: "end_turn",
-        usage: {
-          inputTokens: 1,
-          outputTokens: 1,
-          totalTokens: 2,
-          inputTokenDetails: { noCacheTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0 },
-          outputTokenDetails: { textTokens: 1, reasoningTokens: undefined },
-        },
-        providerMetadata: { anthropic: {} },
-      },
-    ])
-
-    expect(events[0]).toMatchObject({
-      type: "step-finish",
-      providerMetadata: {
-        anthropic: { cacheCreationInputTokens: 11_771 },
-        copilot: { totalNanoAiu: 4_473_525_000 },
-      },
-    })
-    expect(events[1]).toMatchObject({ type: "step-finish", providerMetadata: { anthropic: {} } })
-    if (events[1].type !== "step-finish") throw new Error("expected step-finish")
-    expect(events[1].providerMetadata?.copilot).toBeUndefined()
+    expect(stepFinish.usage?.cacheWriteInputTokens).toBe(100)
   })
 })
 
@@ -846,10 +679,14 @@ describe("session.llm.stream", () => {
       }),
     {
       config: () =>
-        customOpenRouterConfig(loadFixture(vivgridFixture.fixtureProviderID, vivgridFixture.modelID).model, "@ai-sdk/openai-compatible", {
-          apiKey: "test-key",
-          baseURL: `${state.server!.url.origin}/v1`,
-        }),
+        customOpenRouterConfig(
+          loadFixture(vivgridFixture.fixtureProviderID, vivgridFixture.modelID).model,
+          "@ai-sdk/openai-compatible",
+          {
+            apiKey: "test-key",
+            baseURL: `${state.server!.url.origin}/v1`,
+          },
+        ),
     },
   )
 
@@ -907,10 +744,14 @@ describe("session.llm.stream", () => {
       }),
     {
       config: () =>
-        customOpenRouterConfig(loadFixture(vivgridFixture.fixtureProviderID, vivgridFixture.modelID).model, "@ai-sdk/openai-compatible", {
-          apiKey: "test-key",
-          baseURL: `${state.server!.url.origin}/v1`,
-        }),
+        customOpenRouterConfig(
+          loadFixture(vivgridFixture.fixtureProviderID, vivgridFixture.modelID).model,
+          "@ai-sdk/openai-compatible",
+          {
+            apiKey: "test-key",
+            baseURL: `${state.server!.url.origin}/v1`,
+          },
+        ),
     },
   )
 
@@ -967,10 +808,14 @@ describe("session.llm.stream", () => {
       }),
     {
       config: () =>
-        customOpenRouterConfig(loadFixture(alibabaQwenFixture.fixtureProviderID, alibabaQwenFixture.modelID).model, "@ai-sdk/openai-compatible", {
-          apiKey: "test-key",
-          baseURL: `${state.server!.url.origin}/v1`,
-        }),
+        customOpenRouterConfig(
+          loadFixture(alibabaQwenFixture.fixtureProviderID, alibabaQwenFixture.modelID).model,
+          "@ai-sdk/openai-compatible",
+          {
+            apiKey: "test-key",
+            baseURL: `${state.server!.url.origin}/v1`,
+          },
+        ),
     },
   )
 
@@ -1032,10 +877,14 @@ describe("session.llm.stream", () => {
       }),
     {
       config: () =>
-        customOpenRouterConfig(loadFixture(alibabaQwenFixture.fixtureProviderID, alibabaQwenFixture.modelID).model, "@ai-sdk/openai-compatible", {
-          apiKey: "test-key",
-          baseURL: `${state.server!.url.origin}/v1`,
-        }),
+        customOpenRouterConfig(
+          loadFixture(alibabaQwenFixture.fixtureProviderID, alibabaQwenFixture.modelID).model,
+          "@ai-sdk/openai-compatible",
+          {
+            apiKey: "test-key",
+            baseURL: `${state.server!.url.origin}/v1`,
+          },
+        ),
     },
   )
 

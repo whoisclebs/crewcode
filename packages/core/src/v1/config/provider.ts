@@ -98,6 +98,10 @@ export const Info = Schema.Struct({
         setCacheKey: Schema.optional(Schema.Boolean).annotate({
           description: "Enable promptCacheKey for this provider (default false)",
         }),
+        setCacheControl: Schema.optional(Schema.Boolean).annotate({
+          description:
+            "Mark cache breakpoints (cache_control) in the prompt. By default this is on for Claude models, and on OpenRouter also for Qwen and Gemini. Set it to true for an endpoint that serves such a model under another name, or to false to turn it off.",
+        }),
         timeout: Schema.optional(
           Schema.Union([PositiveInt, Schema.Literal(false)]).annotate({
             description: "Timeout in milliseconds for full requests to this provider. Set to false to disable timeout.",

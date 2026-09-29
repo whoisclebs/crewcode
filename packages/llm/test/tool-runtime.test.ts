@@ -12,7 +12,6 @@ import {
   toDefinitions,
 } from "../src"
 import { Auth, LLMClient } from "../src/route"
-import * as AnthropicMessages from "../src/protocols/anthropic-messages"
 import * as OpenAIChat from "../src/protocols/openai-chat"
 import * as OpenAIResponses from "../src/protocols/openai-responses"
 import { Tool, ToolFailure, type ToolExecuteContext } from "../src/tool"
@@ -468,70 +467,6 @@ describe("LLMClient tools", () => {
     }),
   )
 
-  it.effect("preserves provider metadata when folding streamed assistant content into follow-up history", () =>
-    Effect.gen(function* () {
-      const bodies: unknown[] = []
-      const layer = dynamicResponse((input) =>
-        Effect.sync(() => {
-          bodies.push(decodeJson(input.text))
-          return input.respond(
-            bodies.length === 1
-              ? sseEvents(
-                  { type: "message_start", message: { usage: { input_tokens: 5 } } },
-                  { type: "content_block_start", index: 0, content_block: { type: "thinking", thinking: "" } },
-                  { type: "content_block_delta", index: 0, delta: { type: "thinking_delta", thinking: "thinking" } },
-                  { type: "content_block_delta", index: 0, delta: { type: "signature_delta", signature: "sig_1" } },
-                  { type: "content_block_stop", index: 0 },
-                  {
-                    type: "content_block_start",
-                    index: 1,
-                    content_block: { type: "tool_use", id: "call_1", name: "get_weather" },
-                  },
-                  {
-                    type: "content_block_delta",
-                    index: 1,
-                    delta: { type: "input_json_delta", partial_json: '{"city":"Paris"}' },
-                  },
-                  { type: "content_block_stop", index: 1 },
-                  { type: "message_delta", delta: { stop_reason: "tool_use" }, usage: { output_tokens: 5 } },
-                )
-              : sseEvents(
-                  { type: "message_start", message: { usage: { input_tokens: 5 } } },
-                  { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } },
-                  { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "Done." } },
-                  { type: "content_block_stop", index: 0 },
-                  { type: "message_delta", delta: { stop_reason: "end_turn" }, usage: { output_tokens: 1 } },
-                ),
-            { headers: { "content-type": "text/event-stream" } },
-          )
-        }),
-      )
-
-      yield* TestToolRuntime.runTools({
-        request: LLM.updateRequest(baseRequest, {
-          model: AnthropicMessages.route
-            .with({ auth: Auth.header("x-api-key", "test") })
-            .model({ id: "claude-sonnet-4-5" }),
-        }),
-        tools: { get_weather },
-      }).pipe(Stream.runCollect, Effect.provide(layer))
-
-      expect(bodies[1]).toMatchObject({
-        messages: [
-          { role: "user" },
-          {
-            role: "assistant",
-            content: [
-              { type: "thinking", thinking: "thinking", signature: "sig_1" },
-              { type: "tool_use", id: "call_1", name: "get_weather", input: { city: "Paris" } },
-            ],
-          },
-          { role: "user", content: [{ type: "tool_result", tool_use_id: "call_1" }] },
-        ],
-      })
-    }),
-  )
-
   it.effect("replays encrypted OpenAI reasoning items with tool outputs", () =>
     Effect.gen(function* () {
       const bodies: unknown[] = []
@@ -719,71 +654,6 @@ describe("LLMClient tools", () => {
       expect(events.filter(LLMEvent.is.finish)).toHaveLength(1)
       expect(events.filter(LLMEvent.is.stepStart).map((event) => event.index)).toEqual([0, 1])
       expect(events.filter(LLMEvent.is.stepFinish).map((event) => event.index)).toEqual([0, 1])
-    }),
-  )
-
-  it.effect("does not dispatch provider-executed tool calls", () =>
-    Effect.gen(function* () {
-      let streams = 0
-      const layer = dynamicResponse((input) =>
-        Effect.sync(() => {
-          streams++
-          return input.respond(
-            sseEvents(
-              { type: "message_start", message: { usage: { input_tokens: 5 } } },
-              {
-                type: "content_block_start",
-                index: 0,
-                content_block: { type: "server_tool_use", id: "srvtoolu_abc", name: "web_search" },
-              },
-              {
-                type: "content_block_delta",
-                index: 0,
-                delta: { type: "input_json_delta", partial_json: '{"query":"x"}' },
-              },
-              { type: "content_block_stop", index: 0 },
-              {
-                type: "content_block_start",
-                index: 1,
-                content_block: {
-                  type: "web_search_tool_result",
-                  tool_use_id: "srvtoolu_abc",
-                  content: [{ type: "web_search_result", url: "https://example.com", title: "Example" }],
-                },
-              },
-              { type: "content_block_stop", index: 1 },
-              { type: "content_block_start", index: 2, content_block: { type: "text", text: "" } },
-              { type: "content_block_delta", index: 2, delta: { type: "text_delta", text: "Done." } },
-              { type: "content_block_stop", index: 2 },
-              { type: "message_delta", delta: { stop_reason: "end_turn" }, usage: { output_tokens: 8 } },
-            ),
-            { headers: { "content-type": "text/event-stream" } },
-          )
-        }),
-      )
-      const events = Array.from(
-        yield* TestToolRuntime.runTools({
-          request: LLM.updateRequest(baseRequest, {
-            model: AnthropicMessages.route
-              .with({ auth: Auth.header("x-api-key", "test") })
-              .model({ id: "claude-sonnet-4-5" }),
-          }),
-          tools: {},
-        }).pipe(Stream.runCollect, Effect.provide(layer)),
-      )
-
-      expect(streams).toBe(1)
-      expect(events.find(LLMEvent.is.toolError)).toBeUndefined()
-      expect(events.filter(LLMEvent.is.toolCall)).toEqual([
-        {
-          type: "tool-call",
-          id: "srvtoolu_abc",
-          name: "web_search",
-          input: { query: "x" },
-          providerExecuted: true,
-        },
-      ])
-      expect(LLMResponse.text({ events })).toBe("Done.")
     }),
   )
 

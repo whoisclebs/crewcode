@@ -20,13 +20,6 @@ export const nativeOpenAIResponsesContinuation = [
   ...mediaContinuation,
 ] as const satisfies ReadonlyArray<ContinuationFeature>
 
-export const nativeAnthropicMessagesContinuation = [
-  ...basicContinuation,
-  ...toolContinuation,
-  "assistant-reasoning",
-  ...mediaContinuation,
-] as const satisfies ReadonlyArray<ContinuationFeature>
-
 export const continuationTool = ToolDefinition.make({
   name: "get_weather",
   description: "Get current weather for a city.",
@@ -95,7 +88,6 @@ export function continuationRequest(input: {
     system: features.has("system") ? "You are concise. Continue from the provided history." : undefined,
     messages,
     tools: features.has("tool-call") ? [continuationTool] : [],
-    cache: "none",
     providerOptions: features.has("encrypted-reasoning")
       ? { openai: { store: false, include: ["reasoning.encrypted_content"], reasoningSummary: "auto" } }
       : undefined,

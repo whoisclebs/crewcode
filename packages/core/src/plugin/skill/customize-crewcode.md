@@ -79,7 +79,7 @@ Every field is optional.
 
   "agent": {
     "my-agent": {
-      "model": "anthropic/claude-sonnet-4-6",
+      "model": "openai/gpt-5.5",
       "mode": "subagent",
       "description": "...",
       "permission": { "edit": "deny" }
@@ -91,10 +91,10 @@ Every field is optional.
   },
 
   "provider": {
-    "anthropic": { "options": { "apiKey": "..." } }
+    "openrouter": { "options": { "apiKey": "..." } }
   },
   "disabled_providers": ["openai"],
-  "enabled_providers": ["anthropic"],
+  "enabled_providers": ["openrouter"],
 
   "mcp": {
     "playwright": {
@@ -138,7 +138,7 @@ Every field is optional.
 
 Shape notes worth being explicit about:
 
-- `model` always carries a provider prefix: `"anthropic/claude-sonnet-4-6"`.
+- `model` always carries a provider prefix: `"openai/gpt-5.5"`.
 - `skills` is an object with `paths` and/or `urls`, not an array.
 - `references` is an object keyed by alias. Each value is a local path, Git repository, or string shorthand.
 - `agent` is an object keyed by agent name, not an array.
@@ -222,7 +222,7 @@ Two ways to define an agent. Use the file form for anything non-trivial.
     "my-reviewer": {
       "description": "Reviews PRs for style violations.",
       "mode": "subagent",
-      "model": "anthropic/claude-sonnet-4-6",
+      "model": "openai/gpt-5.5",
       "permission": { "edit": "deny", "bash": "ask" },
       "prompt": "You are a strict PR reviewer..."
     }
@@ -240,7 +240,7 @@ Two ways to define an agent. Use the file form for anything non-trivial.
 ---
 description: Reviews PRs for style violations.
 mode: subagent
-model: anthropic/claude-sonnet-4-6
+model: openai/gpt-5.5
 permission:
   edit: deny
   bash: ask
@@ -284,7 +284,7 @@ Frontmatter:
 ---
 description: One sentence describing what the command does.
 agent: build
-model: anthropic/claude-sonnet-4-6
+model: openai/gpt-5.5
 ---
 
 (command body in markdown: the prompt crewcode runs, with $ARGUMENTS for the user's input)

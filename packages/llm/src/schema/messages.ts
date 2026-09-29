@@ -1,13 +1,12 @@
 import { Schema } from "effect"
 import { ToolContent, ToolFileContent, ToolTextContent } from "@crewcode/schema/llm"
 import { JsonSchema, MessageRole, ProviderMetadata } from "./ids"
-import { CacheHint, CachePolicy, GenerationOptions, HttpOptions, ModelSchema, ProviderOptions } from "./options"
+import { GenerationOptions, HttpOptions, ModelSchema, ProviderOptions } from "./options"
 import { isRecord } from "../utils/record"
 
 const systemPartSchema = Schema.Struct({
   type: Schema.Literal("text"),
   text: Schema.String,
-  cache: Schema.optional(CacheHint),
   metadata: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
 }).annotate({ identifier: "LLM.SystemPart" })
 export type SystemPart = Schema.Schema.Type<typeof systemPartSchema>
@@ -25,7 +24,6 @@ export const SystemPart = Object.assign(systemPartSchema, {
 export const TextPart = Schema.Struct({
   type: Schema.Literal("text"),
   text: Schema.String,
-  cache: Schema.optional(CacheHint),
   metadata: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
   providerMetadata: Schema.optional(ProviderMetadata),
 }).annotate({ identifier: "LLM.Content.Text" })
@@ -142,7 +140,6 @@ export const ToolResultPart = Object.assign(
     name: Schema.String,
     result: ToolResultValue,
     providerExecuted: Schema.optional(Schema.Boolean),
-    cache: Schema.optional(CacheHint),
     metadata: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
     providerMetadata: Schema.optional(ProviderMetadata),
   }).annotate({ identifier: "LLM.Content.ToolResult" }),
@@ -158,7 +155,6 @@ export const ToolResultPart = Object.assign(
       name: input.name,
       result: ToolResultValue.make(input.result, input.resultType),
       providerExecuted: input.providerExecuted,
-      cache: input.cache,
       metadata: input.metadata,
       providerMetadata: input.providerMetadata,
     }),
@@ -226,7 +222,6 @@ export class ToolDefinition extends Schema.Class<ToolDefinition>("LLM.ToolDefini
   description: Schema.String,
   inputSchema: JsonSchema,
   outputSchema: Schema.optional(JsonSchema),
-  cache: Schema.optional(CacheHint),
   metadata: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
   native: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
 }) {}
@@ -279,7 +274,6 @@ export class LLMRequest extends Schema.Class<LLMRequest>("LLM.Request")({
   providerOptions: Schema.optional(ProviderOptions),
   http: Schema.optional(HttpOptions),
   responseFormat: Schema.optional(ResponseFormat),
-  cache: Schema.optional(CachePolicy),
   metadata: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
 }) {}
 
@@ -297,7 +291,6 @@ export namespace LLMRequest {
     providerOptions: request.providerOptions,
     http: request.http,
     responseFormat: request.responseFormat,
-    cache: request.cache,
     metadata: request.metadata,
   })
 

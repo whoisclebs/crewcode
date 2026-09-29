@@ -90,7 +90,7 @@ export function stream(input: StreamInput): StreamResult {
     model: input.model,
     apiKey: current.apiKey,
     baseURL: current.baseURL,
-    messages: ProviderTransform.message(input.messages, input.model, input.providerOptions ?? {}),
+    messages: ProviderTransform.message(input.messages, input.model, input.providerOptions ?? {}, input.provider.options),
     toolChoice: input.toolChoice,
     temperature: input.temperature,
     topP: input.topP,

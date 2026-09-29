@@ -220,7 +220,8 @@ it.instance(
     expect(provider.models["deepseek-text"].capabilities.interleaved).toEqual({ field: "reasoning_text" })
     expect(provider.models["custom-reasoning"].capabilities.interleaved).toEqual({ field: "vendor_reasoning" })
     expect(provider.models["custom-model"].capabilities.interleaved).toBe(false)
-    expect(provider.models["deepseek-anthropic"].capabilities.interleaved).toBe(false)
+    // Its SDK (@ai-sdk/anthropic) is not bundled, so the model is not offered at all.
+    expect(provider.models["deepseek-anthropic"]).toBeUndefined()
   }),
   {
     config: {
@@ -1032,8 +1033,14 @@ it.instance(
 it.instance("getModel returns consistent results", () =>
   Effect.gen(function* () {
     yield* set("OPENROUTER_API_KEY", "test-api-key")
-    const model1 = yield* Provider.use.getModel(ProviderV2.ID.openrouter, ModelV2.ID.make("anthropic/claude-sonnet-4.6"))
-    const model2 = yield* Provider.use.getModel(ProviderV2.ID.openrouter, ModelV2.ID.make("anthropic/claude-sonnet-4.6"))
+    const model1 = yield* Provider.use.getModel(
+      ProviderV2.ID.openrouter,
+      ModelV2.ID.make("anthropic/claude-sonnet-4.6"),
+    )
+    const model2 = yield* Provider.use.getModel(
+      ProviderV2.ID.openrouter,
+      ModelV2.ID.make("anthropic/claude-sonnet-4.6"),
+    )
     expect(model1.providerID).toEqual(model2.providerID)
     expect(model1.id).toEqual(model2.id)
     expect(model1).toEqual(model2)
@@ -1336,23 +1343,6 @@ test("models.dev reasoning options replace generated variants and unsupported to
         reasoning_options: [{ type: "toggle" }],
         limit: { context: 128_000, output: 64_000 },
       },
-      override: {
-        id: "gemini-3-pro",
-        name: "Override",
-        reasoning: true,
-        reasoning_options: [{ type: "effort", values: ["high"] }],
-        provider: { npm: "@ai-sdk/google" },
-        limit: { context: 128_000, output: 64_000 },
-        experimental: { modes: { fast: {} } },
-      },
-      anthropicCompatible: {
-        id: "k3",
-        name: "Anthropic Compatible",
-        reasoning: true,
-        reasoning_options: [{ type: "effort", values: ["max"] }],
-        provider: { npm: "@ai-sdk/anthropic" },
-        limit: { context: 1_048_576, output: 131_072 },
-      },
     },
   } as unknown as ModelsDev.Provider
 
@@ -1366,38 +1356,6 @@ test("models.dev reasoning options replace generated variants and unsupported to
   })
   expect(models.empty.variants).toEqual({})
   expect(Object.keys(models.fallback.variants ?? {})).toEqual(["none", "low", "medium", "high", "xhigh"])
-  expect(models.override.variants).toEqual({
-    high: { thinkingConfig: { includeThoughts: true, thinkingLevel: "high" } },
-  })
-  expect(models.anthropicCompatible.variants).toEqual({ max: { effort: "max" } })
-  expect(models["gemini-3-pro-fast"].variants).toEqual(models.override.variants)
-})
-
-test("MERGE Gateway exposes declared effort variants without model-specific handling", () => {
-  const provider = {
-    id: "merge-gateway",
-    name: "MERGE Gateway",
-    env: ["MERGE_GATEWAY_API_KEY"],
-    npm: "merge-gateway-ai-sdk-provider",
-    models: {
-      "openai/gpt-5.6-sol": {
-        id: "openai/gpt-5.6-sol",
-        name: "GPT-5.6 Sol",
-        reasoning: true,
-        reasoning_options: [{ type: "effort", values: ["none", "low", "medium", "high", "xhigh", "max"] }],
-        limit: { context: 128_000, output: 64_000 },
-      },
-    },
-  } as unknown as ModelsDev.Provider
-
-  expect(Provider.fromModelsDevProvider(provider).models["openai/gpt-5.6-sol"].variants).toEqual({
-    none: { reasoningEffort: "none" },
-    low: { reasoningEffort: "low" },
-    medium: { reasoningEffort: "medium" },
-    high: { reasoningEffort: "high" },
-    xhigh: { reasoningEffort: "xhigh" },
-    max: { reasoningEffort: "max" },
-  })
 })
 
 test("public provider info omits invalid models", () => {
@@ -1722,4 +1680,3 @@ it.instance(
     expect(providers[ProviderV2.ID.openai]).toBeUndefined()
   }),
 )
-

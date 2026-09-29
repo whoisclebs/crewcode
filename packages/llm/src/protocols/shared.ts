@@ -103,8 +103,7 @@ export const parseJson = (route: string, input: string, message: string) =>
 /**
  * Join the `text` field of a list of parts with newlines. Used by routes
  * that flatten system / message content arrays into a single provider string
- * (OpenAI Chat `system` content, OpenAI Responses `system` content, Gemini
- * `systemInstruction.parts[].text`).
+ * (OpenAI Chat `system` content, OpenAI Responses `system` content).
  */
 export const joinText = (parts: ReadonlyArray<{ readonly text: string }>) => parts.map((part) => part.text).join("\n")
 
@@ -143,7 +142,7 @@ export const wrappedSystemUpdate = Effect.fn("ProviderShared.wrappedSystemUpdate
   message: LLMRequest["messages"][number],
 ) {
   const content = yield* systemUpdateText(route, message)
-  return { type: "text" as const, text: wrapSystemUpdate(content), cache: content.at(-1)?.cache }
+  return { type: "text" as const, text: wrapSystemUpdate(content) }
 })
 
 /**

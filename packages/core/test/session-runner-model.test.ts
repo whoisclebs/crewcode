@@ -205,48 +205,6 @@ describe("SessionRunnerModel", () => {
     }),
   )
 
-  it.effect("overlays selected Anthropic Session variant bodies", () =>
-    Effect.gen(function* () {
-      const catalog = model({ type: "aisdk", package: "@ai-sdk/anthropic", url: "https://anthropic.example/v1" }, [
-        {
-          id: ModelV2.VariantID.make("high"),
-          headers: {},
-          body: { thinking: { type: "enabled", budget_tokens: 12000 } },
-        },
-      ])
-      const session = SessionV2.Info.make({
-        id: SessionV2.ID.make("ses_anthropic_variant"),
-        projectID: ProjectV2.ID.global,
-        title: "test",
-        model: { id: catalog.id, providerID: catalog.providerID, variant: ModelV2.VariantID.make("high") },
-        cost: 0,
-        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
-        time: { created: DateTime.makeUnsafe(0), updated: DateTime.makeUnsafe(0) },
-        location: { directory: AbsolutePath.make("/project") },
-      })
-
-      const resolved = yield* SessionRunnerModel.resolve(session, catalog)
-
-      expect(resolved.route.defaults.http?.body).toEqual({
-        custom_extension: { enabled: true },
-        thinking: { type: "enabled", budget_tokens: 12000 },
-      })
-    }),
-  )
-
-  it.effect("maps catalog Anthropic AI SDK models into native routes", () =>
-    Effect.gen(function* () {
-      const resolved = yield* SessionRunnerModel.fromCatalogModel(
-        model({ type: "aisdk", package: "@ai-sdk/anthropic", url: "https://anthropic.example/v1" }),
-      )
-
-      expect(resolved.route).toMatchObject({
-        id: "anthropic-messages",
-        endpoint: { baseURL: "https://anthropic.example/v1" },
-      })
-    }),
-  )
-
   it.effect("uses resolved credentials for bearer auth", () =>
     Effect.gen(function* () {
       const resolved = yield* SessionRunnerModel.fromCatalogModel(

@@ -64,7 +64,6 @@ export const weatherToolLoopRequest = (input: {
     model: input.model,
     system: input.system ?? "Use the get_weather tool, then answer in one short sentence.",
     prompt: "What is the weather in Paris?",
-    cache: "none",
     generation:
       input.temperature === false
         ? { maxTokens: input.maxTokens ?? 80 }
@@ -305,7 +304,6 @@ const runGeneratedConversation = (context: GoldenScenarioContext, steps: Readonl
           id: step.id ? `${context.id}_${step.id}` : `${context.id}_${generated}`,
           model: context.model,
           system: step.system,
-          cache: "none",
           messages,
           tools: step.tools,
           toolChoice: step.toolChoice,
@@ -377,7 +375,6 @@ const runImageToolResultScenario = (context: GoldenScenarioContext) =>
         id: `${context.id}_image_tool_result`,
         model: context.model,
         system: "Read images carefully. Reply only with the visible text, lowercase, no punctuation.",
-        cache: "none",
         generation: generation(context, context.maxTokens ?? 40),
         messages: [
           Message.user("Use the read_screenshot tool, then reply with the words shown."),

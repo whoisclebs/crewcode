@@ -341,22 +341,6 @@ describe("session.llm-native.request", () => {
     expect(openai.route.id).toBe("openai-responses")
     expect(openai.route.endpoint.baseURL).toBe("https://api.openai.com/v1")
 
-    const anthropic = LLMNative.model({
-      model: { ...baseModel, api: { ...baseModel.api, url: "", npm: "@ai-sdk/anthropic" } },
-      apiKey: "test-key",
-      messages: [],
-    })
-    expect(anthropic.route.id).toBe("anthropic-messages")
-    expect(anthropic.route.endpoint.baseURL).toBe("https://api.anthropic.com/v1")
-
-    const google = LLMNative.model({
-      model: { ...baseModel, api: { ...baseModel.api, url: "", npm: "@ai-sdk/google" } },
-      apiKey: "test-key",
-      messages: [],
-    })
-    expect(google.route.id).toBe("gemini")
-    expect(google.route.endpoint.baseURL).toBe("https://generativelanguage.googleapis.com/v1beta")
-
     const compatible = LLMNative.model({
       model: {
         ...baseModel,

@@ -196,8 +196,6 @@ const live: Layer.Layer<
               }),
             )
           },
-          // Copilot returns the authoritative billed amount only in provider-specific response fields.
-          includeRawChunks: input.model.providerID.includes("github-copilot"),
           async experimental_repairToolCall(failed) {
             const lower = failed.toolCall.toolName.toLowerCase()
             if (lower !== failed.toolCall.toolName && prepared.tools[lower]) {
@@ -239,6 +237,7 @@ const live: Layer.Layer<
                       args.params.prompt,
                       input.model,
                       prepared.messageTransformOptions,
+                      item.options,
                     )
                   }
                   return args.params
@@ -288,8 +287,6 @@ const live: Layer.Layer<
     return Service.of({ stream })
   }),
 )
-
-export const hasToolCalls = LLMRequestPrep.hasToolCalls
 
 export const node = LayerNode.make({
   service: Service,

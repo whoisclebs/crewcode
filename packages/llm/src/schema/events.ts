@@ -34,17 +34,11 @@ import { ProviderFailureClassification } from "./errors"
  *
  * **Semantics by provider**:
  *
- * - OpenAI Chat / Responses / Gemini / Bedrock: provider reports inclusive
- *   `inputTokens` and an inclusive `outputTokens`; mapper subtracts to
- *   derive the breakdown.
- * - Anthropic: provider reports the breakdown natively (`input_tokens` is
- *   non-cached only); mapper sums to derive the inclusive `inputTokens`.
- *   Anthropic does *not* break extended-thinking out of `output_tokens`, so
- *   `reasoningTokens` is `undefined` and `outputTokens` carries the
- *   combined total — a documented limitation of the Anthropic API.
+ * - OpenAI Chat / Responses: provider reports inclusive `inputTokens` and an
+ *   inclusive `outputTokens`; mapper subtracts to derive the breakdown.
  *
  * `providerMetadata` always carries the provider's raw usage payload —
- * keyed by provider name (`{ openai: ... }`, `{ anthropic: ... }`, etc.)
+ * keyed by provider name (`{ openai: ... }`, `{ openrouter: ... }`, etc.)
  * — for fields we don't normalize and for billing-level audit trails.
  * Matches the same escape-hatch field on `LLMEvent`.
  */

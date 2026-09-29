@@ -91,9 +91,10 @@ describe("Config", () => {
     Effect.sync(() => {
       const migrated = ConfigMigrateV1.migrate({
         provider: {
-          bedrock: {
-            npm: "@ai-sdk/amazon-bedrock",
+          local: {
+            npm: "@ai-sdk/openai-compatible",
             options: {
+              baseURL: "http://localhost:11434/v1",
               headers: { "x-test": "1" },
               body: { trace: true },
               region: "us-east-1",
@@ -103,12 +104,13 @@ describe("Config", () => {
         },
       })
 
-      expect(migrated.providers?.bedrock?.api).toEqual({
+      expect(migrated.providers?.local?.api).toEqual({
         type: "aisdk",
-        package: "@ai-sdk/amazon-bedrock",
+        package: "@ai-sdk/openai-compatible",
+        url: "http://localhost:11434/v1",
         settings: { region: "us-east-1", profile: "dev" },
       })
-      expect(migrated.providers?.bedrock?.request).toEqual({
+      expect(migrated.providers?.local?.request).toEqual({
         headers: { "x-test": "1" },
         body: { trace: true },
       })
@@ -538,18 +540,6 @@ describe("Config", () => {
                       },
                     },
                   },
-                  anthropic: {
-                    npm: "@ai-sdk/anthropic",
-                    models: {
-                      model: {
-                        options: {
-                          effort: "high",
-                          taskBudget: 4096,
-                          metadata: { userId: "user-1" },
-                        },
-                      },
-                    },
-                  },
                 },
                 compaction: { auto: true, tail_turns: 3, preserve_recent_tokens: 2000, reserved: 10000 },
                 experimental: { mcp_timeout: 5000 },
@@ -614,18 +604,6 @@ describe("Config", () => {
                     body: { temperature: 0.3, reasoning: { effort: "high" }, service_tier: "priority" },
                   },
                   variants: [{ id: "high", body: { reasoning: { effort: "high", summary: "auto" } } }],
-                },
-              },
-            })
-            expect(documents[0]?.info.providers?.anthropic).toMatchObject({
-              models: {
-                model: {
-                  request: {
-                    body: {
-                      output_config: { effort: "high", task_budget: 4096 },
-                      metadata: { user_id: "user-1" },
-                    },
-                  },
                 },
               },
             })

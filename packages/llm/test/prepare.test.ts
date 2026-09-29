@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { Effect, Schema } from "effect"
 import { HttpClientRequest } from "effect/unstable/http"
 import { LLM, mergeProviderOptions } from "../src"
-import { AnthropicMessages, OpenAIChat } from "../src/protocols"
+import { OpenAIChat } from "../src/protocols"
 import { Auth, LLMClient } from "../src/route"
 import { it } from "./lib/effect"
 import { dynamicResponse } from "./lib/http"
@@ -153,26 +153,6 @@ describe("request option precedence", () => {
         _tag: "InvalidRequest",
         message: "http.body cannot overlay protocol-owned field(s): model, messages, tools",
       })
-    }),
-  )
-
-  it.effect("uses model output limits after route limits and before call maxTokens", () =>
-    Effect.gen(function* () {
-      const route = AnthropicMessages.route.with({
-        endpoint: { baseURL: "https://api.anthropic.test/v1/" },
-        auth: Auth.header("x-api-key", "test"),
-        limits: { output: 128 },
-      })
-      const model = route.model({ id: "claude-sonnet-4-5", defaults: { limits: { output: 64 } } })
-      const withoutMaxTokens = yield* LLMClient.prepare<AnthropicMessages.AnthropicMessagesBody>(
-        LLM.request({ model, prompt: "Say hello.", cache: "none" }),
-      )
-      const withMaxTokens = yield* LLMClient.prepare<AnthropicMessages.AnthropicMessagesBody>(
-        LLM.request({ model, prompt: "Say hello.", cache: "none", generation: { maxTokens: 32 } }),
-      )
-
-      expect(withoutMaxTokens.body.max_tokens).toBe(64)
-      expect(withMaxTokens.body.max_tokens).toBe(32)
     }),
   )
 })
