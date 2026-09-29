@@ -63,8 +63,13 @@ const source = () => ({
 })
 
 describe("buildSnapshot", () => {
-  test("keeps only the allowed providers", () => {
-    expect(Object.keys(buildSnapshot(source())).sort()).toEqual(["openai", "openai-codex", "openrouter"])
+  test("keeps the providers whose SDK is bundled and leaves out the rest", () => {
+    const input = {
+      ...source(),
+      groq: { id: "groq", name: "Groq", env: ["GROQ_API_KEY"], npm: "@ai-sdk/openai-compatible", api: "https://api.groq.com/openai/v1", models: { "llama": model("llama") } },
+      anthropic: { id: "anthropic", name: "Anthropic", env: ["ANTHROPIC_API_KEY"], npm: "@ai-sdk/anthropic", models: { "claude-x": model("claude-x") } },
+    }
+    expect(Object.keys(buildSnapshot(input)).sort()).toEqual(["groq", "openai", "openai-codex", "openrouter"])
   })
 
   test("derives the Codex flow from OpenAI models with the same eligibility rule as before", () => {
@@ -123,10 +128,13 @@ describe("buildSnapshot", () => {
     expect(() => buildSnapshot(missing)).toThrow(/openai/)
   })
 
-  test("fails on data that violates the catalog schema", () => {
+  test("drops a model that violates the catalog schema and keeps the rest", () => {
     const broken = source()
     ;(broken.openrouter.models["acme/one"] as Record<string, unknown>).limit = "not a limit"
-    expect(() => buildSnapshot(broken)).toThrow()
+    const result = buildSnapshot(broken)
+    // openrouter had only that model, so the provider is left out instead of being listed empty.
+    expect(result.openrouter).toBeUndefined()
+    expect(Object.keys(result.openai.models).length).toBeGreaterThan(0)
   })
 
   test("fails when the Codex rule leaves no eligible model", () => {

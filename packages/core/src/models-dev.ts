@@ -2,7 +2,6 @@ import { Context, Effect, Layer, Schema } from "effect"
 import { FSUtil } from "./fs-util"
 import { makeGlobalNode } from "./effect/app-node"
 import { Flag } from "./flag/flag"
-import { ProviderAllowlist } from "./provider-allowlist"
 import snapshot from "./catalog/models-snapshot.json" with { type: "json" }
 
 export const CatalogModelStatus = Schema.Literals(["alpha", "beta", "deprecated"])
@@ -150,7 +149,7 @@ const layer = Layer.effect(
     const populate = Effect.gen(function* () {
       const file = Flag.CREWCODE_MODELS_PATH
       const catalog = file ? yield* loadLocal(file) : (snapshot as unknown as Record<string, Provider>)
-      return ProviderAllowlist.filter(catalog)
+      return catalog
     }).pipe(Effect.withSpan("ModelsDev.populate"))
 
     const cached = yield* Effect.cached(populate)

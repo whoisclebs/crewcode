@@ -134,7 +134,6 @@ export type ProviderAuthError = {
     | "ProviderAuthOauthCodeMissing"
     | "ProviderAuthOauthCallbackFailed"
     | "ProviderAuthValidationFailed"
-    | "ProviderAuthUnsupported"
   data: {
     providerID?: string
     field?: string
@@ -1736,6 +1735,7 @@ export type ProviderConfig = {
     baseURL?: string
     enterpriseUrl?: string
     setCacheKey?: boolean
+    setCacheControl?: boolean
     /**
      * Timeout in milliseconds for full requests to this provider. Set to false to disable timeout.
      */

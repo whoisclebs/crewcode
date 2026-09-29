@@ -54,7 +54,7 @@ export function createDialogProviderOptions() {
   const onboarded = useConnected()
 
   const options = createMemo(() => {
-    return pipe(
+    const listed = pipe(
       providerOptions(sync.data.provider_next.all),
       map((provider) => {
         const providerID = provider.providerID
@@ -143,6 +143,25 @@ export function createDialogProviderOptions() {
         }
       }),
     )
+    // The list only holds the main providers and the ones already set up. Any other provider of the catalog, or one
+    // declared in crewcode.json, is reached by its id.
+    const other = {
+      title: "Other provider…",
+      value: "other",
+      description: "Any provider by id, for example deepseek",
+      category: "Providers",
+      gutter: undefined,
+      async onSelect() {
+        const id = (await DialogPrompt.show(dialog, "Provider id", { placeholder: "deepseek" }))?.trim()
+        if (!id) return
+        if (!/^[0-9a-z-]+$/.test(id)) {
+          toast.show({ variant: "error", message: "Use lowercase letters, digits and hyphens only." })
+          return
+        }
+        dialog.replace(() => <ApiMethod providerID={id} title="API key" />)
+      },
+    }
+    return [...listed, other]
   })
   return options
 }

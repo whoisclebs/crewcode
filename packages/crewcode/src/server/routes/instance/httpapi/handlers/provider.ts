@@ -11,17 +11,7 @@ import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
 import { ProviderAuthApiError } from "../groups/provider"
 import { ProviderV2 } from "@crewcode/core/provider"
-import { ProviderAllowlist } from "@crewcode/core/provider-allowlist"
-
-function requireSupported(providerID: string) {
-  if (ProviderAllowlist.isAllowed(providerID)) return Effect.void
-  return Effect.fail(
-    new ProviderAuthApiError({
-      name: "ProviderAuthUnsupported",
-      data: { providerID: ProviderV2.ID.make(providerID), message: ProviderAllowlist.message(providerID) },
-    }),
-  )
-}
+import { ProviderDrivers } from "@crewcode/core/provider-drivers"
 
 function mapProviderAuthError<A, R>(self: Effect.Effect<A, ProviderAuth.Error, R>) {
   return self.pipe(
@@ -65,8 +55,16 @@ export const providerHandlers = HttpApiBuilder.group(InstanceHttpApi, "provider"
         mapValues(filtered, (item) => Provider.fromModelsDevProvider(item)),
         connected,
       )
+      const declared = config.provider ?? {}
       return {
-        all: Object.values(providers).map(Provider.toPublicInfo),
+        all: Object.values(providers)
+          .filter((item) =>
+            ProviderDrivers.isVisible(item.id, {
+              connected: item.id in connected || !!credentials[item.id],
+              declared: item.id in declared,
+            }),
+          )
+          .map(Provider.toPublicInfo),
         default: Provider.defaultModelIDs(providers),
         connected: Object.keys(providers).filter((id) => id in connected || credentials[id]),
       }
@@ -80,7 +78,6 @@ export const providerHandlers = HttpApiBuilder.group(InstanceHttpApi, "provider"
       params: { providerID: ProviderV2.ID }
       payload: ProviderAuth.AuthorizeInput
     }) {
-      yield* requireSupported(ctx.params.providerID)
       return yield* mapProviderAuthError(
         svc.authorize({
           providerID: ctx.params.providerID,
@@ -109,7 +106,6 @@ export const providerHandlers = HttpApiBuilder.group(InstanceHttpApi, "provider"
       params: { providerID: ProviderV2.ID }
       payload: ProviderAuth.CallbackInput
     }) {
-      yield* requireSupported(ctx.params.providerID)
       yield* mapProviderAuthError(
         svc.callback({
           providerID: ctx.params.providerID,

@@ -5,7 +5,6 @@ import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { RootHttpApi } from "../api"
 import { LogInput } from "../groups/control"
 import { ProviderAuthApiError } from "../groups/provider"
-import { ProviderAllowlist } from "@crewcode/core/provider-allowlist"
 import { ProviderV2 } from "@crewcode/core/provider"
 
 export const controlHandlers = HttpApiBuilder.group(RootHttpApi, "control", (handlers) =>
@@ -16,12 +15,6 @@ export const controlHandlers = HttpApiBuilder.group(RootHttpApi, "control", (han
       params: { providerID: ProviderV2.ID }
       payload: Auth.Info
     }) {
-      if (!ProviderAllowlist.isAllowed(ctx.params.providerID)) {
-        return yield* new ProviderAuthApiError({
-          name: "ProviderAuthUnsupported",
-          data: { providerID: ctx.params.providerID, message: ProviderAllowlist.message(ctx.params.providerID) },
-        })
-      }
       yield* auth.set(ctx.params.providerID, ctx.payload).pipe(Effect.orDie)
       return true
     })

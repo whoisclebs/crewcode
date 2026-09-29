@@ -10,6 +10,7 @@ import { map, pipe, sortBy, values } from "remeda"
 import path from "path"
 import os from "os"
 import { Config } from "@/config/config"
+import { ProviderDrivers } from "@crewcode/core/provider-drivers"
 import { Global } from "@crewcode/core/global"
 import { Plugin } from "../../plugin"
 import type { Hooks } from "@crewcode/plugin"
@@ -330,14 +331,7 @@ export const ProvidersLoginCommand = effectCmd({
     }
     const hooks = yield* pluginSvc.list()
 
-    const priority: Record<string, number> = {
-      openai: 1,
-      "github-copilot": 2,
-      google: 3,
-      anthropic: 4,
-      openrouter: 5,
-      vercel: 6,
-    }
+    const priority: Record<string, number> = { "openai-codex": 0, openai: 1, openrouter: 2 }
     const pluginProviders = resolvePluginProviders({
       hooks,
       existingProviders: providers,
@@ -345,7 +339,7 @@ export const ProvidersLoginCommand = effectCmd({
       enabled,
       providerNames: Object.fromEntries(Object.entries(config.provider ?? {}).map(([id, p]) => [id, p.name])),
     })
-    const options = [
+    const allOptions = [
       ...pipe(
         providers,
         values(),
@@ -356,9 +350,7 @@ export const ProvidersLoginCommand = effectCmd({
         map((x) => ({
           label: x.name,
           value: x.id,
-          hint: {
-            openai: "ChatGPT Plus/Pro or API key",
-          }[x.id],
+          hint: { "openai-codex": "ChatGPT Plus/Pro account", openai: "API key", openrouter: "API key" }[x.id],
         })),
       ),
       ...pluginProviders.map((x) => ({
@@ -368,11 +360,18 @@ export const ProvidersLoginCommand = effectCmd({
       })),
     ]
 
+    // The catalog is much larger than what is worth listing. The menu shows the main providers and the ones already set
+    // up; any other one is reached by id (`crewcode providers login deepseek`) or with "Other".
+    const stored = yield* authSvc.all().pipe(Effect.orDie)
+    const options = allOptions.filter((x) =>
+      ProviderDrivers.isVisible(x.value, { connected: x.value in stored, declared: x.value in (config.provider ?? {}) }),
+    )
+
     let provider: string
     if (args.provider) {
       const input = args.provider
-      const byID = options.find((x) => x.value === input)
-      const byName = options.find((x) => x.label.toLowerCase() === input.toLowerCase())
+      const byID = allOptions.find((x) => x.value === input)
+      const byName = allOptions.find((x) => x.label.toLowerCase() === input.toLowerCase())
       const match = byID ?? byName
       if (!match) {
         return yield* fail(`Unknown provider "${input}"`)
@@ -411,20 +410,6 @@ export const ProvidersLoginCommand = effectCmd({
       yield* Prompt.log.warn(
         `This only stores a credential for ${provider} - you will need configure it in crewcode.json, check the docs for examples.`,
       )
-    }
-
-    if (provider === "amazon-bedrock") {
-      yield* Prompt.log.info(
-        "Amazon Bedrock authentication priority:\n" +
-          "  1. Bearer token (AWS_BEARER_TOKEN_BEDROCK or /connect)\n" +
-          "  2. AWS credential chain (profile, access keys, IAM roles, EKS IRSA)\n\n" +
-          "Configure via crewcode.json options (profile, region, endpoint) or\n" +
-          "AWS environment variables (AWS_PROFILE, AWS_REGION, AWS_ACCESS_KEY_ID, AWS_WEB_IDENTITY_TOKEN_FILE).",
-      )
-    }
-
-    if (provider === "vercel") {
-      yield* Prompt.log.info("You can create an api key at https://vercel.link/ai-gateway-token")
     }
 
     const key = yield* Prompt.password({

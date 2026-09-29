@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
-// Regenerates src/catalog/models-snapshot.json, the only model catalog CrewCode reads at runtime.
+// Regenerates src/catalog/models-snapshot.json, the only model catalog CrewCode reads at runtime. It keeps the providers
+// whose SDK is bundled (see src/provider-drivers.ts), which includes every OpenAI-compatible provider of models.dev.
 //
 // This is a developer command and the one place that touches the network for catalog data. Run it on purpose, review the
 // diff, commit the result. Nothing at runtime fetches or refreshes the catalog.
@@ -13,7 +14,7 @@ import { rename, writeFile } from "fs/promises"
 import path from "path"
 import { Schema } from "effect"
 import { ModelsDev } from "../src/models-dev"
-import { ProviderAllowlist } from "../src/provider-allowlist"
+import { ProviderDrivers } from "../src/provider-drivers"
 
 const DEFAULT_SOURCE = "https://models.dev/api.json"
 const CODEX_ID = "openai-codex"
@@ -32,11 +33,27 @@ export function buildSnapshot(source: Record<string, unknown>): Record<string, M
   const missing = REQUIRED.filter((id) => !(id in source))
   if (missing.length > 0) throw new Error(`source catalog is missing required provider(s): ${missing.join(", ")}`)
 
-  const decoded = decodeCatalog(Object.fromEntries(REQUIRED.map((id) => [id, source[id]])))
+  // Keep every provider whose SDK ships inside CrewCode. The rest of the catalog could not be loaded, so it stays out.
+  const usable = Object.entries(source).filter(
+    ([, provider]) => typeof (provider as { npm?: unknown })?.npm === "string" && ProviderDrivers.isBundled((provider as { npm: string }).npm),
+  )
+  // models.dev is community data: a model that misses a required field is dropped instead of failing the whole run.
+  const isModel = Schema.is(ModelsDev.Model)
+  let skipped = 0
+  const clean = usable.map(([id, provider]) => {
+    const models = Object.entries((provider as { models?: Record<string, unknown> }).models ?? {}).filter(([, model]) => {
+      const ok = isModel(model)
+      if (!ok) skipped++
+      return ok
+    })
+    return [id, { ...(provider as object), models: Object.fromEntries(models) }] as const
+  })
+  if (skipped > 0) console.error(`skipped ${skipped} model(s) that do not match the catalog schema`)
+  const decoded = decodeCatalog(Object.fromEntries(clean.filter(([, provider]) => Object.keys(provider.models).length > 0)))
   const codex = deriveCodex(decoded.openai)
   if (Object.keys(codex.models).length === 0) throw new Error(`no eligible models left for ${CODEX_ID}`)
 
-  const snapshot = ProviderAllowlist.filter({ ...decoded, [CODEX_ID]: codex })
+  const snapshot = { ...decoded, [CODEX_ID]: codex }
   return sortKeys(snapshot)
 }
 

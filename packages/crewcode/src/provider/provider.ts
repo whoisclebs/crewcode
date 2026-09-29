@@ -1,4 +1,4 @@
-import { ProviderAllowlist } from "@crewcode/core/provider-allowlist"
+import { ProviderDrivers } from "@crewcode/core/provider-drivers"
 import { LayerNode } from "@crewcode/core/effect/layer-node"
 import { ConfigV1 } from "@crewcode/core/v1/config/config"
 import fuzzysort from "fuzzysort"
@@ -129,7 +129,7 @@ type BundledSDK = {
   responses?: (modelId: string) => LanguageModelV3
 }
 
-const BUNDLED_PROVIDERS: Record<string, () => Promise<(opts: any) => BundledSDK>> = {
+const BUNDLED_PROVIDERS: Record<ProviderDrivers.Bundled, () => Promise<(opts: any) => BundledSDK>> = {
   "@ai-sdk/openai": () => import("@ai-sdk/openai").then((m) => m.createOpenAI),
   "@ai-sdk/openai-compatible": () => import("@ai-sdk/openai-compatible").then((m) => m.createOpenAICompatible),
   "@openrouter/ai-sdk-provider": () => import("@openrouter/ai-sdk-provider").then((m) => m.createOpenRouter),
@@ -312,7 +312,8 @@ export function toPublicInfo(provider: Info): Info {
 }
 
 export function defaultModelIDs<T extends { models: Record<string, { id: string }> }>(providers: Record<string, T>) {
-  return mapValues(providers, (item) => sort(Object.values(item.models))[0].id)
+  const withModels = pickBy(providers, (item) => Object.keys(item.models).length > 0)
+  return mapValues(withModels, (item) => sort(Object.values(item.models))[0].id)
 }
 
 export class ModelNotFoundError extends Schema.TaggedErrorClass<ModelNotFoundError>()("ProviderModelNotFoundError", {
@@ -322,7 +323,6 @@ export class ModelNotFoundError extends Schema.TaggedErrorClass<ModelNotFoundErr
   cause: Schema.optional(Schema.Defect()),
 }) {
   override get message() {
-    if (!ProviderAllowlist.isAllowed(this.providerID)) return ProviderAllowlist.message(this.providerID)
     const suggestions = this.suggestions?.length ? ` Did you mean: ${this.suggestions.join(", ")}?` : ""
     return `Model not found: ${this.providerID}/${this.modelID}.${suggestions}`
   }
@@ -604,18 +604,11 @@ const layer = Layer.effect(
         const plugins = yield* plugin.list()
 
         // now read config providers - includes any modifications from plugin config() hook
-        const configProviders = Object.entries(cfg.provider ?? {}).filter(([id]) => ProviderAllowlist.isAllowed(id))
-        const unsupported = Object.keys(cfg.provider ?? {}).filter((id) => !ProviderAllowlist.isAllowed(id))
-        if (unsupported.length > 0) {
-          yield* Effect.logWarning(
-            `Ignoring config for unsupported providers: ${unsupported.join(", ")}. ${ProviderAllowlist.message(unsupported[0])}`,
-          )
-        }
+        const configProviders = Object.entries(cfg.provider ?? {})
         const disabled = new Set(cfg.disabled_providers ?? [])
         const enabled = cfg.enabled_providers ? new Set(cfg.enabled_providers) : null
 
         function isProviderAllowed(providerID: ProviderV2.ID): boolean {
-          if (!ProviderAllowlist.isAllowed(providerID)) return false
           if (enabled && !enabled.has(providerID)) return false
           if (disabled.has(providerID)) return false
           return true
@@ -820,6 +813,7 @@ const layer = Layer.effect(
           mergeProvider(providerID, partial)
         }
 
+        const unavailable = new Map<string, string>()
         for (const [id, provider] of Object.entries(providers)) {
           const providerID = ProviderV2.ID.make(id)
           if (!isProviderAllowed(providerID)) {
@@ -844,6 +838,11 @@ const layer = Layer.effect(
               delete provider.models[modelID]
             if (model.status === "alpha" && !runtimeFlags.enableExperimentalModels) delete provider.models[modelID]
             if (model.status === "deprecated") delete provider.models[modelID]
+            if (!ProviderDrivers.isAvailable(model.api.npm)) {
+              // The catalog lists providers whose SDK is not bundled. They stay out of the list instead of failing on first use.
+              if (configProvider) unavailable.set(providerID, model.api.npm)
+              delete provider.models[modelID]
+            }
             if (
               (configProvider?.blacklist && configProvider.blacklist.includes(modelID)) ||
               (configProvider?.whitelist && !configProvider.whitelist.includes(modelID))
@@ -869,6 +868,8 @@ const layer = Layer.effect(
             continue
           }
         }
+
+        for (const [id, npm] of unavailable) yield* Effect.logWarning(ProviderDrivers.message(id, npm))
 
         return {
           models: languages,
@@ -935,7 +936,7 @@ const layer = Layer.effect(
         delete options["chunkTimeout"]
         delete options["headerTimeout"]
 
-        const bundledLoader = BUNDLED_PROVIDERS[model.api.npm]
+        const bundledLoader = ProviderDrivers.isBundled(model.api.npm) ? BUNDLED_PROVIDERS[model.api.npm] : undefined
         if (bundledLoader) {
           const factory = await bundledLoader()
           const loaded = factory({

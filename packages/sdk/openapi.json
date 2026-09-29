@@ -4656,6 +4656,154 @@
         ]
       }
     },
+    "/permission/mode": {
+      "get": {
+        "tags": ["permission"],
+        "operationId": "permission.mode",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "How actions that need approval are handled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "type": "string",
+                      "enum": ["manual", "auto", "observe", "unguarded"]
+                    }
+                  },
+                  "required": ["mode"],
+                  "additionalProperties": false,
+                  "description": "How actions that need approval are handled"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Get how actions that need approval are handled: manual, auto, observe or unguarded.",
+        "summary": "Get approval mode",
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createCrewcodeClient } from \"@crewcode/sdk\n\nconst client = createCrewcodeClient()\nawait client.permission.mode({\n  ...\n})"
+          }
+        ]
+      },
+      "put": {
+        "tags": ["permission"],
+        "operationId": "permission.setMode",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The mode now in effect",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "type": "string",
+                      "enum": ["manual", "auto", "observe", "unguarded"]
+                    }
+                  },
+                  "required": ["mode"],
+                  "additionalProperties": false,
+                  "description": "The mode now in effect"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest | InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/effect_HttpApiError_BadRequest"
+                    },
+                    {
+                      "$ref": "#/components/schemas/InvalidRequestError"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Switch between manual, auto and observe while running. The unguarded mode cannot be entered or left this way.",
+        "summary": "Set approval mode",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "enum": ["manual", "auto", "observe"]
+                  }
+                },
+                "required": ["mode"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createCrewcodeClient } from \"@crewcode/sdk\n\nconst client = createCrewcodeClient()\nawait client.permission.setMode({\n  ...\n})"
+          }
+        ]
+      }
+    },
     "/provider": {
       "get": {
         "tags": ["provider"],
@@ -15161,8 +15309,7 @@
               "ProviderAuthOauthMissing",
               "ProviderAuthOauthCodeMissing",
               "ProviderAuthOauthCallbackFailed",
-              "ProviderAuthValidationFailed",
-              "ProviderAuthUnsupported"
+              "ProviderAuthValidationFailed"
             ]
           },
           "data": {
@@ -20227,6 +20374,9 @@
                 "type": "string"
               },
               "setCacheKey": {
+                "type": "boolean"
+              },
+              "setCacheControl": {
                 "type": "boolean"
               },
               "timeout": {

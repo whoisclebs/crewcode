@@ -3,7 +3,6 @@ import { Effect, Layer } from "effect"
 import { AppNodeBuilder } from "@crewcode/core/effect/app-node-builder"
 import { Flag } from "@crewcode/core/flag/flag"
 import { ModelsDev } from "@crewcode/core/models-dev"
-import { ProviderAllowlist } from "@crewcode/core/provider-allowlist"
 import { it } from "./lib/effect"
 import { mkdtemp, rm, writeFile } from "fs/promises"
 import os from "os"
@@ -46,7 +45,7 @@ const catalogFile = async (data: Record<string, ModelsDev.Provider>) => {
 const get = () => ModelsDev.Service.use((service) => service.get()).pipe(Effect.provide(Layer.fresh(AppNodeBuilder.build(ModelsDev.node))))
 
 describe("ModelsDev Service", () => {
-  it.live("get() reads the local catalog file and keeps only allowed providers", () =>
+  it.live("get() reads the local catalog file", () =>
     Effect.gen(function* () {
       const { dir, file } = yield* Effect.promise(() =>
         catalogFile({
@@ -58,17 +57,18 @@ describe("ModelsDev Service", () => {
       )
       Flag.CREWCODE_MODELS_PATH = file
       const result = yield* get().pipe(Effect.ensuring(Effect.promise(() => rm(dir, { recursive: true, force: true }))))
-      expect(Object.keys(result).sort()).toEqual(["openai", "openrouter"])
+      expect(Object.keys(result).sort()).toEqual(["anthropic", "crewcode", "openai", "openrouter"])
       expect(result.openai.models["openai-1"].name).toBe("openai one")
     }),
   )
 
-  it.live("get() falls back to the bundled snapshot with exactly the allowed providers", () =>
+  it.live("get() falls back to the bundled snapshot", () =>
     Effect.gen(function* () {
       Flag.CREWCODE_MODELS_PATH = undefined
       const result = yield* get()
-      expect(Object.keys(result).sort()).toEqual([...ProviderAllowlist.ids].sort())
-      for (const id of ProviderAllowlist.ids) expect(Object.keys(result[id].models).length).toBeGreaterThan(0)
+      for (const id of ["openrouter", "openai", "openai-codex"]) {
+        expect(Object.keys(result[id].models).length).toBeGreaterThan(0)
+      }
     }),
   )
 

@@ -4,7 +4,6 @@ import { Effect, Layer, Record, Result, Schema, Context } from "effect"
 import { NonNegativeInt } from "@crewcode/core/schema"
 import { Global } from "@crewcode/core/global"
 import { FSUtil } from "@crewcode/core/fs-util"
-import { ProviderAllowlist } from "@crewcode/core/provider-allowlist"
 
 export const OAUTH_DUMMY_KEY = "crewcode-oauth-dummy-key"
 
@@ -38,13 +37,12 @@ export class AuthError extends Schema.TaggedErrorClass<AuthError>()("AuthError",
 const CODEX = "openai-codex"
 // Before the Codex flow had its own provider, its OAuth credential was stored under "openai".
 const LEGACY_CODEX = "openai"
-const warned = new Set<string>()
 
 function view(data: Record<string, Info>): Record<string, Info> {
   const legacy = data[LEGACY_CODEX]
-  if (legacy?.type !== "oauth") return ProviderAllowlist.filter(data)
+  if (legacy?.type !== "oauth") return data
   const migrated = Object.fromEntries(Object.entries(data).filter(([id]) => id !== LEGACY_CODEX))
-  return ProviderAllowlist.filter({ [CODEX]: legacy, ...migrated })
+  return { [CODEX]: legacy, ...migrated }
 }
 
 export interface Interface {
@@ -62,8 +60,8 @@ const layer = Layer.effect(
     const fsys = yield* FSUtil.Service
     const decode = Schema.decodeUnknownOption(Info)
 
-    // What is on disk (or in CREWCODE_AUTH_CONTENT), untouched. Writes start from this, so credentials of providers
-    // CrewCode no longer supports stay in the file instead of being erased by an unrelated set or remove.
+    // What is on disk (or in CREWCODE_AUTH_CONTENT), untouched. Writes start from this, so an unrelated set or remove
+    // never erases a credential.
     const stored = Effect.fn("Auth.stored")(function* () {
       if (process.env.CREWCODE_AUTH_CONTENT) {
         try {
@@ -75,16 +73,9 @@ const layer = Layer.effect(
       return Record.filterMap(data, (value) => Result.fromOption(decode(value), () => undefined))
     })
 
-    // What the rest of the app sees: only allowed providers, with the ChatGPT OAuth credential under openai-codex.
+    // What the rest of the app sees: the stored credentials, with the ChatGPT OAuth credential under openai-codex.
     const all = Effect.fn("Auth.all")(function* () {
       const data = yield* stored()
-      const ignored = Object.keys(data).filter((id) => !ProviderAllowlist.isAllowed(id) && !warned.has(id))
-      for (const id of ignored) warned.add(id)
-      if (ignored.length > 0) {
-        yield* Effect.logWarning(
-          `Ignoring stored credentials for unsupported providers: ${ignored.join(", ")}. ${ProviderAllowlist.message(ignored[0])}`,
-        )
-      }
       return view(data)
     })
 
@@ -94,7 +85,6 @@ const layer = Layer.effect(
 
     const set = Effect.fn("Auth.set")(function* (key: string, info: Info) {
       const norm = key.replace(/\/+$/, "")
-      if (!ProviderAllowlist.isAllowed(norm)) return yield* new AuthError({ message: ProviderAllowlist.message(norm) })
       const data = yield* stored()
       if (norm !== key) delete data[key]
       delete data[norm + "/"]

@@ -1,5 +1,4 @@
 import { Integration } from "@crewcode/core/integration"
-import { ProviderAllowlist } from "@crewcode/core/provider-allowlist"
 import { Effect } from "effect"
 import { HttpApiBuilder, HttpApiSchema } from "effect/unstable/httpapi"
 import { Api } from "../api"
@@ -16,11 +15,6 @@ const authorize = <A, R>(effect: Effect.Effect<A, Integration.AuthorizationError
         }),
     ),
   )
-
-const requireSupported = (integrationID: string) =>
-  ProviderAllowlist.isAllowed(integrationID)
-    ? Effect.void
-    : Effect.fail(new InvalidRequestError({ message: ProviderAllowlist.message(integrationID), kind: "unsupported_provider" }))
 
 export const IntegrationHandler = HttpApiBuilder.group(Api, "server.integration", (handlers) =>
   Effect.gen(function* () {
@@ -43,7 +37,6 @@ export const IntegrationHandler = HttpApiBuilder.group(Api, "server.integration"
         "integration.connect.key",
         Effect.fn(function* (ctx) {
           const service = yield* Integration.Service
-          yield* requireSupported(ctx.params.integrationID)
           yield* authorize(
             service.connection.key({
               integrationID: ctx.params.integrationID,
@@ -58,7 +51,6 @@ export const IntegrationHandler = HttpApiBuilder.group(Api, "server.integration"
         "integration.connect.oauth",
         Effect.fn(function* (ctx) {
           const service = yield* Integration.Service
-          yield* requireSupported(ctx.params.integrationID)
           return yield* response(
             authorize(
               service.connection.oauth({

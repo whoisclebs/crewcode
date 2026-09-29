@@ -6,7 +6,7 @@ It is a hard fork of [OpenCode](https://github.com/anomalyco/opencode) (MIT). Th
 
 ## What it is
 
-- **Three providers, and only those:** OpenRouter (API key), OpenAI API (API key) and OpenAI Codex (sign in with a ChatGPT account). They are separate authentication and billing flows. Any other provider is refused in the catalog, in configuration, in `auth.json`, in the environment, in plugins and in the server routes.
+- **Every provider that speaks the OpenAI protocol, no list of names:** the local catalog holds all the models.dev providers whose SDK ships inside CrewCode: `@ai-sdk/openai-compatible` (DeepSeek, Ollama Cloud and about 180 others), `@ai-sdk/openai` and OpenRouter. OpenAI Codex (sign in with a ChatGPT account) is derived from the OpenAI models and is a separate flow. Add anything else (a local Ollama, vLLM, LM Studio, your own gateway) in `crewcode.json` with `"npm": "@ai-sdk/openai-compatible"` and a `baseURL`. A provider that needs its own SDK (Anthropic, Google, Bedrock and so on) does not appear, because CrewCode never installs code at run time.
 - **Local model catalog:** a versioned snapshot, with no remote lookup at startup or during use.
 - **Local sessions only:** there is no session sharing. `export` and `import` of a file remain.
 - **No OpenCode services:** no accounts, console, Zen/Go, auto-update, telemetry, plugin installation or binary downloads at run time.
@@ -32,9 +32,27 @@ crewcode --auto                                # TUI with contextual review of a
 crewcode audit stats                           # what the reviewer decided and how many false approvals
 ```
 
+An OpenAI-compatible provider, for example a local Ollama:
+
+```jsonc
+// crewcode.json
+{
+  "provider": {
+    "ollama": {
+      "name": "Ollama",
+      "npm": "@ai-sdk/openai-compatible",
+      "options": { "baseURL": "http://localhost:11434/v1", "apiKey": "ollama" },
+      "models": { "qwen2.5-coder:32b": { "name": "Qwen 2.5 Coder 32B" } }
+    }
+  }
+}
+```
+
 `crewcode run` reads `stdin` when it is not a terminal (so that `cat file | crewcode run "..."` works). In scripts with no input, use `< /dev/null`.
 
 There is no syntax highlighting by default: no parser is bundled in the repository. To turn it on, run `bun run --cwd packages/tui setup:parsers` once. It is the only step that downloads anything, and only when you ask for it.
+
+Prompt caching: providers that cache on their own (OpenAI, DeepSeek, Groq, Grok, Moonshot, Z.AI) need nothing. CrewCode marks cache breakpoints (`cache_control`) for Claude models on any provider, and for Qwen and Gemini on OpenRouter, and it sends `X-Session-Id` so OpenRouter keeps a conversation on the same backend. For a custom endpoint that serves a Claude model under another name, set `"setCacheControl": true` in that provider's `options`.
 
 ## Documentation
 
