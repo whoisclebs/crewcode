@@ -35,8 +35,10 @@ export interface DecideInput {
 }
 
 export interface Interface {
-  /** How requests are answered right now: the command line flag, then the config, then manual. */
+  /** How requests are answered right now: `unguarded` (flag only), the choice made while running, the command line flag, the config, then manual. */
   readonly mode: () => Effect.Effect<Mode>
+  /** Changes the mode while running. `unguarded` is never entered or left this way. Returns the mode now in effect. */
+  readonly setMode: (mode: Exclude<Mode, "unguarded">) => Effect.Effect<Mode>
   /** Never fails. A problem in here is reported as a decision that asks the user. */
   readonly decide: (input: DecideInput) => Effect.Effect<Decision>
   /** Records that everything was approved without review. */
@@ -67,9 +69,20 @@ const layer = Layer.effect(
     const home = os.homedir()
     const failures = new Map<string, number>()
 
+    let chosen: Exclude<Mode, "unguarded"> | undefined
+
     const mode = Effect.fn("PermissionReview.mode")(function* () {
+      if (flags.approvalMode === "unguarded") return "unguarded"
+      if (chosen) return chosen
       if (flags.approvalMode) return flags.approvalMode
       return (yield* config.get()).approval?.mode ?? "manual"
+    })
+
+    const setMode = Effect.fn("PermissionReview.setMode")(function* (next: Exclude<Mode, "unguarded">) {
+      if (flags.approvalMode === "unguarded") return "unguarded" as Mode
+      chosen = next
+      failures.clear()
+      return next as Mode
     })
 
     const record = (entry: Audit.AuditRecord) =>
@@ -232,7 +245,7 @@ const layer = Layer.effect(
       )
     })
 
-    return Service.of({ mode, decide: safeDecide, unguarded, answered })
+    return Service.of({ mode, setMode, decide: safeDecide, unguarded, answered })
   }),
 )
 

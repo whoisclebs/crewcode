@@ -14,6 +14,10 @@ export interface Interface {
   readonly ask: (input: PermissionV1.AskInput) => Effect.Effect<void, PermissionV1.Error>
   readonly reply: (input: PermissionV1.ReplyInput) => Effect.Effect<void, PermissionV1.NotFoundError>
   readonly list: () => Effect.Effect<ReadonlyArray<PermissionV1.Request>>
+  /** How actions that need approval are handled right now. */
+  readonly mode: () => Effect.Effect<PermissionReview.Mode>
+  /** Changes the mode while running. `unguarded` cannot be entered or left this way. Returns the mode now in effect. */
+  readonly setMode: (mode: Exclude<PermissionReview.Mode, "unguarded">) => Effect.Effect<PermissionReview.Mode>
 }
 
 interface PendingEntry {
@@ -201,7 +205,7 @@ const layer = Layer.effect(
       return Array.from(pending.values(), (item) => item.info)
     })
 
-    return Service.of({ ask, reply, list })
+    return Service.of({ ask, reply, list, mode: review.mode, setMode: review.setMode })
   }),
 )
 

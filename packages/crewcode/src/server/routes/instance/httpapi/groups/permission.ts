@@ -14,6 +14,9 @@ const ReplyPayload = Schema.Struct({
   message: Schema.optional(Schema.String),
 })
 
+const ModeBody = Schema.Struct({ mode: Schema.Literals(["manual", "auto", "observe"]) })
+const ModeInfo = Schema.Struct({ mode: Schema.Literals(["manual", "auto", "observe", "unguarded"]) })
+
 export const PermissionApi = HttpApi.make("permission")
   .add(
     HttpApiGroup.make("permission")
@@ -39,6 +42,29 @@ export const PermissionApi = HttpApi.make("permission")
             identifier: "permission.reply",
             summary: "Respond to permission request",
             description: "Approve or deny a permission request from the AI assistant.",
+          }),
+        ),
+        HttpApiEndpoint.get("mode", `${root}/mode`, {
+          query: WorkspaceRoutingQuery,
+          success: described(ModeInfo, "How actions that need approval are handled"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "permission.mode",
+            summary: "Get approval mode",
+            description: "Get how actions that need approval are handled: manual, auto, observe or unguarded.",
+          }),
+        ),
+        HttpApiEndpoint.put("setMode", `${root}/mode`, {
+          query: WorkspaceRoutingQuery,
+          payload: ModeBody,
+          success: described(ModeInfo, "The mode now in effect"),
+          error: HttpApiError.BadRequest,
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "permission.setMode",
+            summary: "Set approval mode",
+            description:
+              "Switch between manual, auto and observe while running. The unguarded mode cannot be entered or left this way.",
           }),
         ),
       )

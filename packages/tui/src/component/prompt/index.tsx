@@ -1449,7 +1449,7 @@ export function Prompt(props: PromptProps) {
                       <text fg={fadeColor(highlight(), agentMetaAlpha())}>
                         {store.mode === "shell" ? "Shell" : Locale.titlecase(agent().name)}
                       </text>
-                      <Show when={store.mode === "normal" && local.permission.mode !== "manual"}>
+                      <Show when={store.mode === "normal"}>
                         <text
                           fg={fadeColor(
                             local.permission.mode === "unguarded" ? theme.error : theme.textMuted,

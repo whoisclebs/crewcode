@@ -11,6 +11,8 @@ When a permission rule marks an action as `ask`, CrewCode normally asks you. Aut
 | `observe` | `crewcode --approval observe` or `approval.mode: "observe"` | The reviewer decides, but the decision is **not applied**: you are still asked, and your answer is recorded next to the reviewer's opinion. Use it to measure before turning `auto` on. |
 | `unguarded` | only `crewcode --unguarded` | Approves everything without review. Prints a warning on stderr and shows a permanent indicator in the TUI. `deny` rules still apply. It never comes from a configuration file. |
 
+In the TUI, `alt+m` cycles through `manual`, `auto` and `observe` while it runs (`/approval` in the prompt does the same). The current mode is shown next to the agent name. `tab` still switches agent. The choice applies to the whole running instance and is not written to the configuration. `unguarded` is not part of the cycle: it cannot be entered or left from inside the TUI. The keybinding is `permission_mode_cycle` in the TUI configuration.
+
 `--yolo` and `--dangerously-skip-permissions` were removed and fail with a message that points to `--auto` and `--unguarded`. OpenCode's `--auto` approved everything silently; here it means the review.
 
 ## Order of decision

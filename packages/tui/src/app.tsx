@@ -38,7 +38,7 @@ import { SyncProvider, useSync } from "./context/sync"
 import { DataProvider } from "./context/data"
 import { LocationProvider } from "./context/location"
 import { LocalProvider, useLocal } from "./context/local"
-import { PermissionProvider } from "./context/permission"
+import { LABELS as APPROVAL_LABELS, PermissionProvider } from "./context/permission"
 import { DialogModel } from "./component/dialog-model"
 import { useConnected } from "./component/use-connected"
 import { DialogMcp } from "./component/dialog-mcp"
@@ -110,6 +110,7 @@ const appBindingCommands = [
   "mcp.list",
   "agent.cycle",
   "agent.cycle.reverse",
+  "permission.mode.cycle",
   "variant.cycle",
   "variant.list",
   "provider.connect",
@@ -680,6 +681,27 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         hidden: true,
         run: () => {
           local.agent.move(1)
+        },
+      },
+      {
+        name: "permission.mode.cycle",
+        title: "Cycle approval mode",
+        category: "Agent",
+        slashName: "approval",
+        run: () => {
+          void local.permission.cycle().then((mode) => {
+            if (mode === "unguarded") {
+              toast.show({
+                title: "Unguarded",
+                message: "Started with --unguarded. Restart without it to choose another mode.",
+                variant: "warning",
+              })
+            } else if (mode) {
+              toast.show({ title: "Approval mode", message: APPROVAL_LABELS[mode], variant: "info" })
+            } else {
+              toast.show({ title: "Approval mode not changed", message: "The server did not accept the change.", variant: "error" })
+            }
+          })
         },
       },
       {

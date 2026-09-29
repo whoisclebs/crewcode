@@ -9073,6 +9073,68 @@ export type PermissionReplyResponses = {
 
 export type PermissionReplyResponse = PermissionReplyResponses[keyof PermissionReplyResponses]
 
+export type PermissionModeData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/permission/mode"
+}
+
+export type PermissionModeErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type PermissionModeError = PermissionModeErrors[keyof PermissionModeErrors]
+
+export type PermissionModeResponses = {
+  /**
+   * How actions that need approval are handled
+   */
+  200: {
+    mode: "manual" | "auto" | "observe" | "unguarded"
+  }
+}
+
+export type PermissionModeResponse = PermissionModeResponses[keyof PermissionModeResponses]
+
+export type PermissionSetModeData = {
+  body?: {
+    mode: "manual" | "auto" | "observe"
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/permission/mode"
+}
+
+export type PermissionSetModeErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+}
+
+export type PermissionSetModeError = PermissionSetModeErrors[keyof PermissionSetModeErrors]
+
+export type PermissionSetModeResponses = {
+  /**
+   * The mode now in effect
+   */
+  200: {
+    mode: "manual" | "auto" | "observe" | "unguarded"
+  }
+}
+
+export type PermissionSetModeResponse = PermissionSetModeResponses[keyof PermissionSetModeResponses]
+
 export type ProviderListData = {
   body?: never
   path?: never

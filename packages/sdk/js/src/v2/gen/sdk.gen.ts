@@ -116,11 +116,15 @@ import type {
   PathGetResponses,
   PermissionListErrors,
   PermissionListResponses,
+  PermissionModeErrors,
+  PermissionModeResponses,
   PermissionReplyErrors,
   PermissionReplyResponses,
   PermissionRespondErrors,
   PermissionRespondResponses,
   PermissionRuleset,
+  PermissionSetModeErrors,
+  PermissionSetModeResponses,
   PermissionV2Reply,
   PermissionV2Source,
   ProjectCommands,
@@ -2995,6 +2999,73 @@ export class Permission extends HeyApiClient {
     )
     return (options?.client ?? this.client).post<PermissionReplyResponses, PermissionReplyErrors, ThrowOnError>({
       url: "/permission/{requestID}/reply",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Get approval mode
+   *
+   * Get how actions that need approval are handled: manual, auto, observe or unguarded.
+   */
+  public mode<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<PermissionModeResponses, PermissionModeErrors, ThrowOnError>({
+      url: "/permission/mode",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Set approval mode
+   *
+   * Switch between manual, auto and observe while running. The unguarded mode cannot be entered or left this way.
+   */
+  public setMode<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      mode?: "manual" | "auto" | "observe"
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "mode" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).put<PermissionSetModeResponses, PermissionSetModeErrors, ThrowOnError>({
+      url: "/permission/mode",
       ...options,
       ...params,
       headers: {

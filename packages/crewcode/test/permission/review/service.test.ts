@@ -329,4 +329,30 @@ describe("audit", () => {
       expect(written[0]).toMatchObject({ mode: "unguarded", decision: "allow_once", source: "unguarded" })
     }),
   )
+
+  it.instance("switches mode while running", () =>
+    Effect.gen(function* () {
+      expect(yield* PermissionReview.use.mode()).toBe("manual")
+      expect(yield* PermissionReview.use.setMode("auto")).toBe("auto")
+      expect(yield* PermissionReview.use.mode()).toBe("auto")
+      expect(yield* PermissionReview.use.setMode("observe")).toBe("observe")
+      expect(yield* PermissionReview.use.setMode("manual")).toBe("manual")
+      expect(yield* PermissionReview.use.mode()).toBe("manual")
+    }),
+  )
+
+  itAutoFlag.instance("a choice made while running wins over the command line flag", () =>
+    Effect.gen(function* () {
+      expect(yield* PermissionReview.use.mode()).toBe("auto")
+      yield* PermissionReview.use.setMode("observe")
+      expect(yield* PermissionReview.use.mode()).toBe("observe")
+    }),
+  )
+
+  itUnguarded.instance("unguarded cannot be left while running", () =>
+    Effect.gen(function* () {
+      expect(yield* PermissionReview.use.setMode("manual")).toBe("unguarded")
+      expect(yield* PermissionReview.use.mode()).toBe("unguarded")
+    }),
+  )
 })
