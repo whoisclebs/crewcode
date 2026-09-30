@@ -1,0 +1,34 @@
+[package]
+name = "crewcode-tui"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "The CrewTUI terminal interface for CrewCode."
+license = "MIT OR Apache-2.0"
+
+[[bin]]
+name = "crewcode"
+path = "src/main.rs"
+
+[features]
+# Embeds the compiled server ("core", from the CREWCODE_CORE_BIN environment variable) so that the
+# binary is all a user installs. Without it the interface looks for a core next to itself or in the repository.
+embed-core = []
+
+[build-dependencies]
+flate2 = "1"
+
+[dependencies]
+flate2 = "1"
+crewtui = { git = "https://github.com/whoisclebs/crewtui", tag = "v0.2.0" }
+crewtui-rich = { git = "https://github.com/whoisclebs/crewtui", tag = "v0.2.0" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ureq = { version = "3", features = ["json"] }
+base64 = "0.22"
+
+[lints.rust]
+unsafe_code = "deny"
+
+[lints.clippy]
+all = "warn"

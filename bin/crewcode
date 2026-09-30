@@ -1,0 +1,6 @@
+#!/bin/sh
+# Starts CrewCode with the CrewTUI interface in the current directory.
+root=$(cd "$(dirname "$0")/.." && pwd)
+manifest="$root/packages/tui-rs/Cargo.toml"
+cargo build --release --quiet --manifest-path "$manifest" || exit 1
+CREWCODE_ROOT="$root/packages/crewcode" exec "$root/packages/tui-rs/target/release/crewcode" "$@"
