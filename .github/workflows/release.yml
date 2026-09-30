@@ -5,6 +5,15 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  # A pull request that touches the release pipeline builds every target, without publishing.
+  pull_request:
+    paths:
+      - ".github/workflows/release.yml"
+      - "script/release/**"
+      - "packages/tui-rs/**"
+      - "packages/npm/**"
+      - "install"
+      - "install.ps1"
   workflow_dispatch:
     inputs:
       version:
@@ -28,9 +37,13 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       publish: ${{ steps.version.outputs.publish }}
     steps:
+      - uses: actions/checkout@v4
       - id: version
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            version="$(grep -m1 '^version = ' packages/tui-rs/Cargo.toml | cut -d'"' -f2)"
+            publish=false
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             version="${{ inputs.version }}"
             publish="$([ "${{ inputs.dry-run }}" = "true" ] && echo false || echo true)"
           else
