@@ -1,18 +1,14 @@
-// Branded HTML pages for local OAuth callback servers.
+// Pages shown in the browser when a sign-in finishes.
 //
-// These are served by the loopback HTTP servers that finish an OAuth exchange
-// (MCP, Codex/ChatGPT, xAI, Snowflake, DigitalOcean, ...). The functions return
-// a fully self-contained HTML string with no external assets, so they work
-// offline and drop into any transport (`res.end(...)`, Effect `response.end`,
-// etc.).
+// The loopback servers that complete an OAuth exchange (MCP, Codex/ChatGPT, xAI, Snowflake, DigitalOcean, ...)
+// answer the browser with one of these. Each function returns a fully self-contained HTML string with no
+// external assets, so it works offline and drops into any transport (`res.end(...)`, Effect `response.end`, ...).
 //
-// The visual language mirrors the CrewCode app: the design tokens are a curated
-// subset of the OC-2 semantic tokens in `packages/ui/src/styles/theme.css`, and
-// the wordmark is the same geometry as `packages/ui/src/components/logo.tsx`.
-// Keep this file in sync with those sources when the brand changes.
+// The look follows the terminal interface: the CREWCODE wordmark in the same pixel letters, the cyan to violet
+// accent, and a line that sends the reader back to the terminal, where CrewCode carries on by itself.
 
 export interface CallbackPageOptions {
-  /** Friendly integration name shown as a subtitle, e.g. "xAI", "Snowflake", "MCP". */
+  /** Friendly integration name shown in the message, e.g. "xAI", "Snowflake", "MCP". */
   provider?: string
   /** Attempt to close the window shortly after success. Defaults to true. */
   autoClose?: boolean
@@ -21,12 +17,13 @@ export interface CallbackPageOptions {
 export function success(options?: CallbackPageOptions) {
   const provider = options?.provider
   return renderDocument({
-    title: "Authorization successful",
+    title: "Connected",
     body: renderCard({
       status: "success",
-      headline: "Authorization successful",
-      message: provider ? `CrewCode is now connected to ${escapeHtml(provider)}.` : "CrewCode is now authorized.",
-      footnote: "You can close this window.",
+      headline: "You're connected",
+      message: provider ? `CrewCode can now use ${escapeHtml(provider)}.` : "CrewCode is now authorized.",
+      next: "Back in your terminal, CrewCode carries on.",
+      footnote: "You can close this tab.",
     }),
     script: options?.autoClose === false ? undefined : AUTO_CLOSE_SCRIPT,
   })
@@ -35,15 +32,16 @@ export function success(options?: CallbackPageOptions) {
 export function error(detail: string, options?: CallbackPageOptions) {
   const provider = options?.provider
   return renderDocument({
-    title: "Authorization failed",
+    title: "Couldn't connect",
     body: renderCard({
       status: "error",
-      headline: "Authorization failed",
+      headline: "Couldn't connect",
       message: provider
-        ? `CrewCode couldn't finish connecting to ${escapeHtml(provider)}.`
-        : "CrewCode couldn't complete authorization.",
+        ? `CrewCode couldn't finish signing in to ${escapeHtml(provider)}.`
+        : "CrewCode couldn't complete the sign-in.",
       detail,
-      footnote: "Close this window and try again from CrewCode.",
+      next: "Press ctrl+k in CrewCode to try again.",
+      footnote: "You can close this tab.",
     }),
   })
 }
@@ -54,10 +52,9 @@ export interface BootstrapOptions {
   provider?: string
 }
 
-// For flows where the credential arrives in the URL fragment (implicit grant),
-// the browser must relay it back to the loopback server. This renders a pending
-// page whose script reads the fragment, POSTs it to `tokenPath`, then resolves
-// to the success or error state in place.
+// For flows where the credential arrives in the URL fragment (implicit grant), the browser must relay it back to the
+// loopback server. This renders a pending page whose script reads the fragment, POSTs it to `tokenPath`, then
+// resolves to the success or error state in place.
 export function bootstrap(options: BootstrapOptions) {
   return renderDocument({
     title: "Finishing sign-in",
@@ -65,9 +62,10 @@ export function bootstrap(options: BootstrapOptions) {
       status: "pending",
       headline: "Finishing sign-in",
       message: options.provider
-        ? `Completing your ${escapeHtml(options.provider)} authorization.`
-        : "Completing authorization.",
-      footnote: "You can close this window once sign-in finishes.",
+        ? `Completing your ${escapeHtml(options.provider)} sign-in.`
+        : "Completing the sign-in.",
+      next: "This takes a moment.",
+      footnote: "Keep this tab open until it finishes.",
     }),
     script: bootstrapScript(options),
   })
@@ -77,19 +75,27 @@ export * as OauthCallbackPage from "./page"
 
 type Status = "pending" | "success" | "error"
 
-function renderCard(input: { status: Status; headline: string; message: string; detail?: string; footnote: string }) {
+function renderCard(input: {
+  status: Status
+  headline: string
+  message: string
+  detail?: string
+  next: string
+  footnote: string
+}) {
   const detail = input.detail?.trim()
-  return `<main class="card" id="oc-card" data-status="${input.status}" role="status" aria-live="polite">
+  return `<main class="card" id="cc-card" data-status="${input.status}" role="status" aria-live="polite">
       <div class="brand">${WORDMARK}</div>
       <div class="status" aria-hidden="true">
         <span class="icon icon-pending">${ICON_SPINNER}</span>
         <span class="icon icon-success">${ICON_CHECK}</span>
         <span class="icon icon-error">${ICON_CROSS}</span>
       </div>
-      <h1 class="headline" id="oc-headline">${escapeHtml(input.headline)}</h1>
-      <p class="message" id="oc-message">${input.message}</p>
-      <pre class="detail" id="oc-detail"${detail ? "" : " hidden"}>${detail ? escapeHtml(detail) : ""}</pre>
-      <p class="footnote" id="oc-footnote">${escapeHtml(input.footnote)}</p>
+      <h1 class="headline" id="cc-headline">${escapeHtml(input.headline)}</h1>
+      <p class="message" id="cc-message">${input.message}</p>
+      <pre class="detail" id="cc-detail"${detail ? "" : " hidden"}>${detail ? escapeHtml(detail) : ""}</pre>
+      <p class="next" id="cc-next"><span class="prompt" aria-hidden="true">❯</span> <span id="cc-next-text">${escapeHtml(input.next)}</span></p>
+      <p class="footnote" id="cc-footnote">${escapeHtml(input.footnote)}</p>
     </main>`
 }
 
@@ -109,15 +115,15 @@ function renderDocument(input: { title: string; body: string; script?: string })
 </html>`
 }
 
-const AUTO_CLOSE_SCRIPT = `setTimeout(function(){try{window.close()}catch(e){}},2500)`
+const AUTO_CLOSE_SCRIPT = `setTimeout(function(){try{window.close()}catch(e){}},4000)`
 
 function bootstrapScript(options: BootstrapOptions) {
   return `var PROVIDER=${scriptString(options.provider ?? "")};
 var TOKEN_URL=new URL(${scriptString(options.tokenPath)},window.location.origin).href;
 (function(){
-  var card=document.getElementById("oc-card"),headline=document.getElementById("oc-headline"),message=document.getElementById("oc-message"),detail=document.getElementById("oc-detail"),footnote=document.getElementById("oc-footnote");
-  function fail(text){card.dataset.status="error";headline.textContent="Authorization failed";message.textContent=PROVIDER?("CrewCode couldn't finish connecting to "+PROVIDER+"."):"CrewCode couldn't complete authorization.";if(text){detail.textContent=text;detail.hidden=false}footnote.textContent="Close this window and try again from CrewCode."}
-  function ok(){card.dataset.status="success";headline.textContent="Authorization successful";message.textContent=PROVIDER?("CrewCode is now connected to "+PROVIDER+"."):"CrewCode is now authorized.";detail.hidden=true;footnote.textContent="You can close this window.";setTimeout(function(){try{window.close()}catch(e){}},2500)}
+  var card=document.getElementById("cc-card"),headline=document.getElementById("cc-headline"),message=document.getElementById("cc-message"),detail=document.getElementById("cc-detail"),next=document.getElementById("cc-next-text"),footnote=document.getElementById("cc-footnote");
+  function fail(text){card.dataset.status="error";headline.textContent="Couldn't connect";message.textContent=PROVIDER?("CrewCode couldn't finish signing in to "+PROVIDER+"."):"CrewCode couldn't complete the sign-in.";if(text){detail.textContent=text;detail.hidden=false}next.textContent="Press ctrl+k in CrewCode to try again.";footnote.textContent="You can close this tab."}
+  function ok(){card.dataset.status="success";headline.textContent="You're connected";message.textContent=PROVIDER?("CrewCode can now use "+PROVIDER+"."):"CrewCode is now authorized.";detail.hidden=true;next.textContent="Back in your terminal, CrewCode carries on.";footnote.textContent="You can close this tab.";setTimeout(function(){try{window.close()}catch(e){}},4000)}
   try{
     var hash=new URLSearchParams((window.location.hash||"").slice(1));
     var search=new URLSearchParams(window.location.search||"");
@@ -146,45 +152,47 @@ function escapeHtml(value: string) {
     .replaceAll("'", "&#39;")
 }
 
-// Curated subset of OC-2 tokens (packages/ui/src/styles/theme.css). Default is
-// light; dark applies via prefers-color-scheme. The [data-theme] selectors let a
-// host force a scheme without changing the default.
+// Light by default; dark follows the system, and [data-theme] lets a host force one.
 const LIGHT_VARS = `
-    --oc-bg: #f8f8f8;
-    --oc-card: #fcfcfc;
-    --oc-text-strong: #171717;
-    --oc-text-base: #6f6f6f;
-    --oc-text-weak: #8f8f8f;
-    --oc-border-weak: #e5e5e5;
-    --oc-icon-strong: #171717;
-    --oc-icon-base: #8f8f8f;
-    --oc-icon-weak: #dbdbdb;
-    --oc-success: #2dba26;
-    --oc-error: #ed4831;
-    --oc-detail-bg: #fff8f6;
-    --oc-detail-border: #fdc3b7;
-    --oc-shadow: 0 16px 48px -6px rgba(0,0,0,.10), 0 6px 12px -2px rgba(0,0,0,.05), 0 1px 2px rgba(0,0,0,.06);`
+    --cc-bg: #f6f7fb;
+    --cc-card: #ffffff;
+    --cc-text-strong: #14151c;
+    --cc-text-base: #4b5060;
+    --cc-text-weak: #7a8090;
+    --cc-border: #e3e5ee;
+    --cc-wordmark-dim: #9aa0b4;
+    --cc-accent-from: #0891b2;
+    --cc-accent-to: #7c3aed;
+    --cc-success: #15803d;
+    --cc-error: #dc2626;
+    --cc-detail-bg: #fef2f2;
+    --cc-detail-border: #fecaca;
+    --cc-terminal-bg: #14151c;
+    --cc-terminal-text: #d6d9e6;
+    --cc-shadow: 0 18px 50px -10px rgba(20,21,28,.14), 0 4px 10px -2px rgba(20,21,28,.06);`
 
 const DARK_VARS = `
-    --oc-bg: #101010;
-    --oc-card: #161616;
-    --oc-text-strong: rgba(255,255,255,.936);
-    --oc-text-base: rgba(255,255,255,.618);
-    --oc-text-weak: rgba(255,255,255,.422);
-    --oc-border-weak: #282828;
-    --oc-icon-strong: #ededed;
-    --oc-icon-base: #7e7e7e;
-    --oc-icon-weak: #343434;
-    --oc-success: #12c905;
-    --oc-error: #fc533a;
-    --oc-detail-bg: #28110c;
-    --oc-detail-border: #6a1206;
-    --oc-shadow: 0 16px 48px -6px rgba(0,0,0,.55), 0 6px 12px -2px rgba(0,0,0,.35), 0 1px 2px rgba(0,0,0,.4);`
+    --cc-bg: #0d0e14;
+    --cc-card: #151722;
+    --cc-text-strong: #eef0f8;
+    --cc-text-base: #aab0c4;
+    --cc-text-weak: #7d849a;
+    --cc-border: #262a3b;
+    --cc-wordmark-dim: #5b6279;
+    --cc-accent-from: #22d3ee;
+    --cc-accent-to: #a78bfa;
+    --cc-success: #4ade80;
+    --cc-error: #f87171;
+    --cc-detail-bg: #2a1215;
+    --cc-detail-border: #6b1d24;
+    --cc-terminal-bg: #0a0b10;
+    --cc-terminal-text: #c9cde0;
+    --cc-shadow: 0 18px 50px -10px rgba(0,0,0,.6), 0 4px 10px -2px rgba(0,0,0,.4);`
 
 const STYLES = `
   :root { color-scheme: light dark;${LIGHT_VARS}
-    --oc-font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    --oc-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    --cc-font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --cc-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {${DARK_VARS} } }
   :root[data-theme="dark"] {${DARK_VARS} }
@@ -197,45 +205,54 @@ const STYLES = `
     display: grid;
     place-items: center;
     padding: 24px;
-    background: var(--oc-bg);
-    color: var(--oc-text-base);
-    font-family: var(--oc-font-sans);
+    background: var(--cc-bg);
+    color: var(--cc-text-base);
+    font-family: var(--cc-font-sans);
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
   .card {
-    width: min(100%, 28rem);
-    padding: 2.25rem 2rem 1.75rem;
-    background: var(--oc-card);
-    border: 1px solid var(--oc-border-weak);
-    border-radius: 14px;
-    box-shadow: var(--oc-shadow);
+    position: relative;
+    width: min(100%, 30rem);
+    padding: 2.5rem 2rem 1.75rem;
+    background: var(--cc-card);
+    border: 1px solid var(--cc-border);
+    border-radius: 16px;
+    box-shadow: var(--cc-shadow);
     text-align: center;
+    overflow: hidden;
+  }
+  .card::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--cc-accent-from), var(--cc-accent-to));
   }
   .brand { display: flex; justify-content: center; margin-bottom: 1.75rem; }
-  .brand svg { height: 19px; width: auto; }
-  .status { display: flex; justify-content: center; margin-bottom: 1.125rem; }
+  .brand svg { height: 34px; width: auto; }
+  .status { display: flex; justify-content: center; margin-bottom: 1rem; }
   .icon { display: none; line-height: 0; }
   .icon svg { display: block; }
   .card[data-status="pending"] .icon-pending,
   .card[data-status="success"] .icon-success,
   .card[data-status="error"] .icon-error { display: block; }
-  .icon-success { color: var(--oc-success); }
-  .icon-error { color: var(--oc-error); }
-  .icon-pending { color: var(--oc-text-weak); }
-  .headline { margin: 0; font-size: 1.1875rem; font-weight: 500; line-height: 1.3; letter-spacing: -0.012em; color: var(--oc-text-strong); }
-  .message { margin: 0.5rem 0 0; font-size: 0.9375rem; color: var(--oc-text-base); }
+  .icon-success { color: var(--cc-success); }
+  .icon-error { color: var(--cc-error); }
+  .icon-pending { color: var(--cc-text-weak); }
+  .headline { margin: 0; font-size: 1.3rem; font-weight: 600; line-height: 1.3; letter-spacing: -0.015em; color: var(--cc-text-strong); }
+  .message { margin: 0.5rem 0 0; font-size: 0.975rem; color: var(--cc-text-base); }
   .detail {
     margin: 1.25rem 0 0;
     padding: 0.75rem 0.875rem;
     text-align: left;
-    font-family: var(--oc-font-mono);
+    font-family: var(--cc-font-mono);
     font-size: 0.8125rem;
     line-height: 1.55;
-    color: var(--oc-text-strong);
-    background: var(--oc-detail-bg);
-    border: 1px solid var(--oc-detail-border);
+    color: var(--cc-text-strong);
+    background: var(--cc-detail-bg);
+    border: 1px solid var(--cc-detail-border);
     border-radius: 8px;
     white-space: pre-wrap;
     word-break: break-word;
@@ -243,31 +260,61 @@ const STYLES = `
     overflow: auto;
   }
   .detail[hidden] { display: none; }
-  .footnote { margin: 1.5rem 0 0; font-size: 0.8125rem; color: var(--oc-text-weak); }
-  .spinner { animation: oc-spin 0.8s linear infinite; transform-origin: center; }
-  @keyframes oc-spin { to { transform: rotate(360deg); } }
+  .next {
+    margin: 1.5rem 0 0;
+    padding: 0.7rem 0.9rem;
+    display: flex;
+    gap: 0.6rem;
+    text-align: left;
+    font-family: var(--cc-font-mono);
+    font-size: 0.8125rem;
+    color: var(--cc-terminal-text);
+    background: var(--cc-terminal-bg);
+    border-radius: 10px;
+  }
+  .prompt { color: var(--cc-accent-from); font-weight: 700; }
+  .card[data-status="error"] .prompt { color: var(--cc-error); }
+  .footnote { margin: 1.25rem 0 0; font-size: 0.8125rem; color: var(--cc-text-weak); }
+  .spinner { animation: cc-spin 0.8s linear infinite; transform-origin: center; }
+  @keyframes cc-spin { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
 `
 
-// CrewCode wordmark — same path geometry as packages/ui/src/components/logo.tsx (Logo).
-const WORDMARK = `<svg class="wordmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 234 42" fill="none" aria-label="CrewCode" role="img">
-        <path d="M18 30H6V18H18V30Z" fill="var(--oc-icon-weak)" />
-        <path d="M18 12H6V30H18V12ZM24 36H0V6H24V36Z" fill="var(--oc-icon-base)" />
-        <path d="M48 30H36V18H48V30Z" fill="var(--oc-icon-weak)" />
-        <path d="M36 30H48V12H36V30ZM54 36H36V42H30V6H54V36Z" fill="var(--oc-icon-base)" />
-        <path d="M84 24V30H66V24H84Z" fill="var(--oc-icon-weak)" />
-        <path d="M84 24H66V30H84V36H60V6H84V24ZM66 18H78V12H66V18Z" fill="var(--oc-icon-base)" />
-        <path d="M108 36H96V18H108V36Z" fill="var(--oc-icon-weak)" />
-        <path d="M108 12H96V36H90V6H108V12ZM114 36H108V12H114V36Z" fill="var(--oc-icon-base)" />
-        <path d="M144 30H126V18H144V30Z" fill="var(--oc-icon-weak)" />
-        <path d="M144 12H126V30H144V36H120V6H144V12Z" fill="var(--oc-icon-strong)" />
-        <path d="M168 30H156V18H168V30Z" fill="var(--oc-icon-weak)" />
-        <path d="M168 12H156V30H168V12ZM174 36H150V6H174V36Z" fill="var(--oc-icon-strong)" />
-        <path d="M198 30H186V18H198V30Z" fill="var(--oc-icon-weak)" />
-        <path d="M198 12H186V30H198V12ZM204 36H180V6H198V0H204V36Z" fill="var(--oc-icon-strong)" />
-        <path d="M234 24V30H216V24H234Z" fill="var(--oc-icon-weak)" />
-        <path d="M216 12V18H228V12H216ZM234 24H216V30H234V36H210V6H234V24Z" fill="var(--oc-icon-strong)" />
+// The CREWCODE wordmark in the pixel letters of the terminal interface: "crew" quiet, "code" in the accent.
+const PIXEL_LETTERS: Record<string, readonly string[]> = {
+  C: [".###", "#...", "#...", "#...", ".###"],
+  R: ["####", "#..#", "####", "#.#.", "#..#"],
+  E: ["####", "#...", "###.", "#...", "####"],
+  W: ["#...#", "#...#", "#.#.#", "##.##", "#...#"],
+  O: [".##.", "#..#", "#..#", "#..#", ".##."],
+  D: ["###.", "#..#", "#..#", "#..#", "###."],
+}
+
+export function wordmark(text: string, quiet: number) {
+  const gap = 1
+  let x = 0
+  let quietWidth = 0
+  const pixels: string[] = []
+  ;[...text].forEach((letter, index) => {
+    const rows = PIXEL_LETTERS[letter]
+    if (!rows) return
+    if (index === quiet) quietWidth = x
+    const fill = index < quiet ? "var(--cc-wordmark-dim)" : "url(#cc-accent)"
+    rows.forEach((row, y) =>
+      [...row].forEach((cell, column) => {
+        if (cell === "#") pixels.push(`<rect x="${x + column}" y="${y}" width="1" height="1" rx="0.12" fill="${fill}" />`)
+      }),
+    )
+    x += rows[0].length + gap
+  })
+  const width = x - gap
+  return `<svg class="wordmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} 5" aria-label="CrewCode" role="img">
+        <defs><linearGradient id="cc-accent" gradientUnits="userSpaceOnUse" x1="${quietWidth}" y1="0" x2="${width}" y2="0"><stop offset="0" stop-color="var(--cc-accent-from)" /><stop offset="1" stop-color="var(--cc-accent-to)" /></linearGradient></defs>
+        ${pixels.join("\n        ")}
       </svg>`
+}
+
+const WORDMARK = wordmark("CREWCODE", 4)
 
 const ICON_CHECK = `<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="m8.5 12.5 2.4 2.4 4.6-5.4" /></svg>`
 
