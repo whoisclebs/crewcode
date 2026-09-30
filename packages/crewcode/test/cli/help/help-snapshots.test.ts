@@ -8,8 +8,8 @@
 // diff tells you exactly which command(s) changed.
 //
 // Snapshots are taken at COLUMNS=120 so wrapping is stable across
-// terminal sizes. The default crewcode tui command is excluded —
-// `crewcode --help` includes an ASCII banner that pulls in the install
+// terminal sizes. The bare `crewcode --help` is excluded —
+// it includes an ASCII banner that pulls in the install
 // version (changes per release), so we'd snapshot a moving target.
 import { describe, expect } from "bun:test"
 import { Effect } from "effect"
@@ -45,7 +45,6 @@ function normalize(text: string): string {
 const TOP_LEVEL = [
   "acp",
   "mcp",
-  "attach",
   "run",
   "debug",
   "providers", // aliased to `auth`
@@ -93,7 +92,8 @@ describe("crewcode CLI help-text snapshots", () => {
         const topLevel = yield* crewcode.spawn(["--help"], { env: SNAPSHOT_ENV })
         expect(topLevel.exitCode).toBe(0)
         expect(topLevel.stderr.endsWith("\n")).toBe(true)
-        expect(topLevel.stderr).toContain("--mini")
+        expect(topLevel.stderr).not.toContain("--mini")
+        expect(topLevel.stderr).not.toContain("attach <url>")
         expect(topLevel.stderr).not.toContain("--thinking")
         expect(topLevel.stderr).not.toContain("--variant")
         expect(topLevel.stderr).not.toContain("--demo")

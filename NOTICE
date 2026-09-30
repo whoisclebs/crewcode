@@ -16,10 +16,6 @@ Model catalog data (packages/core/src/catalog/models-snapshot.json)
   Generated from https://models.dev, MIT License, Copyright (c) 2025 models.dev.
   The source, date and SHA-256 of each snapshot are in models-snapshot.meta.json.
 
-Tree-sitter grammars and highlight queries (packages/tui/src/assets/parsers)
-  Each grammar keeps its own license. The list, the license of each one and its
-  text are in packages/tui/src/assets/parsers/NOTICE.
-
 Other bundled packages keep the licenses they were published with. See the
 LICENSE files inside packages/ and the metadata of each dependency.
 
