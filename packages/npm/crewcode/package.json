@@ -1,0 +1,31 @@
+{
+  "name": "crewcode",
+  "version": "0.0.0",
+  "description": "CrewCode: an AI coding agent for the terminal, shipped as a single native binary.",
+  "license": "MIT",
+  "bin": {
+    "crewcode": "bin/crewcode.js"
+  },
+  "files": [
+    "bin/crewcode.js"
+  ],
+  "engines": {
+    "node": ">=16"
+  },
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
+  "optionalDependencies": {
+    "@crewcode/cli-darwin-arm64": "0.0.0",
+    "@crewcode/cli-darwin-x64": "0.0.0",
+    "@crewcode/cli-linux-arm64": "0.0.0",
+    "@crewcode/cli-linux-x64": "0.0.0",
+    "@crewcode/cli-windows-x64": "0.0.0"
+  }
+}

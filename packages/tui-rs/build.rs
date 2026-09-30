@@ -11,6 +11,7 @@ use flate2::write::GzEncoder;
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-env-changed=CREWCODE_CORE_BIN");
+    println!("cargo:rerun-if-env-changed=CREWCODE_VERSION");
     let out = PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR is set by cargo"));
     let generated = out.join("core_embedded.rs");
 

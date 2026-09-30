@@ -33,6 +33,4 @@ logs/
 *.bun-build
 tsconfig.tsbuildinfo
 
-# Syntax parsers are downloaded by `bun run --cwd packages/tui setup:parsers`, never committed
-packages/tui/src/assets/parsers/*/
-packages/tui/src/assets/parsers/NOTICE
+dist-release

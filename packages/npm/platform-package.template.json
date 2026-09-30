@@ -1,0 +1,10 @@
+{
+  "name": "@crewcode/cli-{{name}}",
+  "version": "{{version}}",
+  "description": "The CrewCode binary for {{name}}. Install `crewcode` instead of this package.",
+  "license": "MIT",
+  "os": ["{{os}}"],
+  "cpu": ["{{cpu}}"],
+  "files": ["bin/"],
+  "preferUnplugged": true
+}
