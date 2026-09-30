@@ -19,6 +19,22 @@ export const ServeCommand = effectCmd({
     const server = yield* Effect.promise(() => Server.listen(opts))
     console.log(`crewcode server listening on http://${server.hostname}:${server.port}`)
 
+    // An interface that started this server exits without warning if it is killed, so the server follows it out.
+    const parent = Number(process.env.CREWCODE_EXIT_WITH_PARENT)
+    if (parent > 0) {
+      setInterval(() => {
+        const alive = (() => {
+          try {
+            process.kill(parent, 0)
+            return true
+          } catch (error) {
+            return (error as NodeJS.ErrnoException).code === "EPERM"
+          }
+        })()
+        if (!alive) process.exit(0)
+      }, 2000).unref()
+    }
+
     yield* Effect.never
   }),
 })
