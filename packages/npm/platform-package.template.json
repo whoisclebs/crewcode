@@ -1,5 +1,5 @@
 {
-  "name": "@crewcode/cli-{{name}}",
+  "name": "crewcode-{{name}}",
   "version": "{{version}}",
   "description": "The CrewCode binary for {{name}}. Install `crewcode` instead of this package.",
   "license": "MIT",

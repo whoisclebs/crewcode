@@ -26,7 +26,7 @@ For each of `linux-x64`, `linux-arm64`, `darwin-x64`, `darwin-arm64` and `window
 | `crewcode-<target>.tar.gz` (`.zip` on Windows) | the `crewcode` / `crewcode.exe` binary at the archive root |
 | `crewcode-<target>.<ext>.sha256` | `<sha256>  <file name>` |
 
-Plus `SHA256SUMS`, `install` and `install.ps1` attached to the GitHub release. On npm: `crewcode` (a 3 kB launcher, `bin/crewcode.js`) with `optionalDependencies` on `@crewcode/cli-<target>` (each holds only the binary, with `os`/`cpu`/`libc` fields so npm installs just the matching one).
+Plus `SHA256SUMS`, `install` and `install.ps1` attached to the GitHub release. On npm: `crewcode` (a 3 kB launcher, `bin/crewcode.js`) with `optionalDependencies` on `crewcode-<target>` (unscoped: the `@crewcode` scope on npm belongs to someone else) (each holds only the binary, with `os`/`cpu`/`libc` fields so npm installs just the matching one).
 
 Not published yet: musl (Alpine) and baseline (no AVX2) builds, Windows arm64 (the installer uses the x64 build under emulation).
 
@@ -61,7 +61,7 @@ The workflow needs the secret `NPM_TOKEN`. The interface library, crewtui, comes
 node script/release/npm-pack.mjs --version 0.1.0
 cd dist-release/npm
 # platform packages first, then the main package
-# npm publish crewcode-cli-linux-x64-0.1.0.tgz --access public   (repeat per platform)
+# npm publish crewcode-linux-x64-0.1.0.tgz --access public   (repeat per platform)
 # npm publish crewcode-0.1.0.tgz --access public
 ```
 
