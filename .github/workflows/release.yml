@@ -112,8 +112,11 @@ jobs:
           cd dist-release
           sha256sum crewcode-*.tar.gz crewcode-*.zip > SHA256SUMS
           cp ../install ../install.ps1 .
+          # A version with a suffix (0.1.0-rc.1) is a pre-release: it must not become the "latest" that the installer follows.
+          flags=""
+          case "$VERSION" in *-*) flags="--prerelease --latest=false" ;; esac
           gh release create "v${VERSION}" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "CrewCode ${VERSION}" --generate-notes \
+            --title "CrewCode ${VERSION}" --generate-notes $flags \
             crewcode-*.tar.gz crewcode-*.zip crewcode-*.sha256 SHA256SUMS install install.ps1
 
   npm:
@@ -141,6 +144,10 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           VERSION: ${{ needs.prepare.outputs.version }}
         run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "NPM_TOKEN is not set: the packages were built but not published."
+            exit 0
+          fi
           tag=latest
           case "$VERSION" in *-*) tag=next ;; esac
           cd dist-release/npm
