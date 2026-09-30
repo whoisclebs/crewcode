@@ -20,6 +20,12 @@ mod transcript;
 mod view;
 
 use std::io::{self, IsTerminal};
+
+/// The release being run: the one the build was stamped with through `CREWCODE_VERSION`, else the crate's own.
+const VERSION: &str = match option_env!("CREWCODE_VERSION") {
+    Some(version) => version,
+    None => env!("CARGO_PKG_VERSION"),
+};
 use std::process::ExitCode;
 
 use app::CrewCode;
@@ -36,7 +42,7 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
         Ok(Invocation::Version) => {
-            println!("crewcode {}", env!("CARGO_PKG_VERSION"));
+            println!("crewcode {VERSION}");
             return ExitCode::SUCCESS;
         }
         Ok(Invocation::Help(args)) => {
