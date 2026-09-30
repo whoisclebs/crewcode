@@ -408,7 +408,7 @@ export async function CodexAuthPlugin(input: PluginInput, options: CodexAuthPlug
 
             return {
               url: authUrl,
-              instructions: "Complete authorization in your browser. This window will close automatically.",
+              instructions: "Sign in to ChatGPT in your browser. CrewCode continues here by itself when you finish.",
               method: "auto" as const,
               callback: async () => {
                 const tokens = await callbackPromise
