@@ -151,6 +151,6 @@ jobs:
           tag=latest
           case "$VERSION" in *-*) tag=next ;; esac
           cd dist-release/npm
-          for tarball in crewcode-cli-*.tgz crewcode-${VERSION}.tgz; do
+          for tarball in crewcode-linux-*.tgz crewcode-darwin-*.tgz crewcode-windows-*.tgz crewcode-${VERSION}.tgz; do
             npm publish "$tarball" --access public --provenance --tag "$tag"
           done

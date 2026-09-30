@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Thin launcher: finds the native CrewCode binary installed by the matching
-// @crewcode/cli-<platform> package and runs it with inherited stdio.
+// crewcode-<platform> package and runs it with inherited stdio.
 "use strict"
 
 const { spawn, spawnSync } = require("node:child_process")
@@ -37,7 +37,7 @@ function findBinary() {
 
   const name = platformName()
   const exe = process.platform === "win32" ? "crewcode.exe" : "crewcode"
-  const pkg = `@crewcode/cli-${name}`
+  const pkg = `crewcode-${name}`
 
   if (isMusl()) fail(`musl libc (Alpine) is not supported by the npm packages yet (${name}).`)
 

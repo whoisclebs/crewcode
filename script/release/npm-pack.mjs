@@ -3,7 +3,7 @@
 //
 //   node script/release/npm-pack.mjs [--version X] [--dry-run]
 //
-// Produces one @crewcode/cli-<platform> package per staged binary plus the main `crewcode`
+// Produces one crewcode-<platform> package per staged binary plus the main `crewcode`
 // package, all with the same version. It never publishes: see docs/distribution.md for the
 // manual `npm publish` commands.
 
@@ -80,7 +80,7 @@ const mainDir = path.join(outDir, "staging", "crewcode")
 fs.mkdirSync(path.join(mainDir, "bin"), { recursive: true })
 const main = JSON.parse(fs.readFileSync(path.join(npmSrc, "crewcode/package.json"), "utf8"))
 main.version = version
-main.optionalDependencies = Object.fromEntries(Object.keys(PLATFORMS).map((name) => [`@crewcode/cli-${name}`, version]))
+main.optionalDependencies = Object.fromEntries(Object.keys(PLATFORMS).map((name) => [`crewcode-${name}`, version]))
 fs.writeFileSync(path.join(mainDir, "package.json"), `${JSON.stringify(main, null, 2)}\n`)
 fs.copyFileSync(path.join(npmSrc, "crewcode/bin/crewcode.js"), path.join(mainDir, "bin/crewcode.js"))
 fs.chmodSync(path.join(mainDir, "bin/crewcode.js"), 0o755)
