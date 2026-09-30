@@ -21,7 +21,7 @@ bun turbo typecheck
 cd packages/crewcode && bun test          # never from the repository root
 ```
 
-Follow the style in `AGENTS.md` and `packages/crewcode/AGENTS.md`.
+Follow the style in `packages/crewcode/AGENTS.md`.
 
 ## Tests
 
