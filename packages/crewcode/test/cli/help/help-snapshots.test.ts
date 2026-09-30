@@ -55,7 +55,6 @@ const TOP_LEVEL = [
   "stats",
   "export",
   "import",
-  "pr",
   "session",
   "db",
 ] as const
