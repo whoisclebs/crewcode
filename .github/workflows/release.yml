@@ -1,0 +1,136 @@
+# Draft release pipeline: one native build per platform, then a GitHub release and npm publish,
+# both behind environment approvals. See docs/distribution.md.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to build, without the leading v (for example 0.1.0)
+        required: true
+      dry-run:
+        description: Build and pack only; skip the GitHub release and the npm publish
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+env:
+  BUN_VERSION: "1.3.14"
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      publish: ${{ steps.version.outputs.publish }}
+    steps:
+      - id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            version="${{ inputs.version }}"
+            publish="$([ "${{ inputs.dry-run }}" = "true" ] && echo false || echo true)"
+          else
+            version="${GITHUB_REF_NAME}"
+            publish=true
+          fi
+          echo "version=${version#v}" >> "$GITHUB_OUTPUT"
+          echo "publish=${publish}" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: linux-x64, runner: ubuntu-latest }
+          - { target: linux-arm64, runner: ubuntu-24.04-arm }
+          # macos-13 is retired; macos-15-intel is the Intel runner label.
+          - { target: darwin-x64, runner: macos-15-intel }
+          - { target: darwin-arm64, runner: macos-14 }
+          - { target: windows-x64, runner: windows-latest }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/tui-rs
+      - run: bun install --frozen-lockfile
+      - run: node script/release/build.mjs --target ${{ matrix.target }} --version ${{ needs.prepare.outputs.version }}
+      - name: Smoke test
+        shell: bash
+        run: |
+          exe=dist-release/${{ matrix.target }}/crewcode
+          [ -f "$exe.exe" ] && exe="$exe.exe"
+          "$exe" --version | grep -F "${{ needs.prepare.outputs.version }}"
+          "$exe" run --help > /dev/null
+      - uses: actions/upload-artifact@v4
+        with:
+          name: crewcode-${{ matrix.target }}
+          path: dist-release/
+          if-no-files-found: error
+
+  release:
+    needs: [prepare, build]
+    if: needs.prepare.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    environment: release # required reviewers gate the publication
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: crewcode-*
+          path: dist-release
+          merge-multiple: true
+      - name: Checksums and release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          cd dist-release
+          sha256sum crewcode-*.tar.gz crewcode-*.zip > SHA256SUMS
+          cp ../install ../install.ps1 .
+          gh release create "v${VERSION}" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "CrewCode ${VERSION}" --generate-notes \
+            crewcode-*.tar.gz crewcode-*.zip crewcode-*.sha256 SHA256SUMS install install.ps1
+
+  npm:
+    needs: [prepare, build]
+    if: needs.prepare.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    environment: npm # required reviewers gate the publication
+    permissions:
+      contents: read
+      id-token: write # npm provenance
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: crewcode-*
+          path: dist-release
+          merge-multiple: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - run: node script/release/npm-pack.mjs --version ${{ needs.prepare.outputs.version }}
+      - name: Publish (platform packages first, then the main package)
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          tag=latest
+          case "$VERSION" in *-*) tag=next ;; esac
+          cd dist-release/npm
+          for tarball in crewcode-cli-*.tgz crewcode-${VERSION}.tgz; do
+            npm publish "$tarball" --access public --provenance --tag "$tag"
+          done

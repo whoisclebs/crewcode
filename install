@@ -1,0 +1,165 @@
+#!/bin/sh
+# CrewCode installer: downloads the single-binary release and installs it.
+#
+#   curl -fsSL <url>/install | sh
+#   curl -fsSL <url>/install | sh -s -- --version 0.1.0 --modify-path
+#
+# Options:  --version X    install this version instead of the latest
+#           --modify-path  append the install dir to your shell profile
+#           --help
+# Environment (all optional):
+#   CREWCODE_REPO         GitHub repository "owner/name" hosting the releases
+#   CREWCODE_VERSION      same as --version
+#   CREWCODE_INSTALL_DIR  install location (default: ~/.crewcode/bin)
+#   CREWCODE_BASE_URL     flat directory serving crewcode-<target>.tar.gz and .sha256 (for testing)
+
+set -eu
+
+CREWCODE_REPO="${CREWCODE_REPO:-whoisclebs/crewcode}"
+INSTALL_DIR="${CREWCODE_INSTALL_DIR:-$HOME/.crewcode/bin}"
+VERSION="${CREWCODE_VERSION:-}"
+MODIFY_PATH=0
+
+say() { printf '%s\n' "$*"; }
+die() { printf 'error: %s\n' "$*" >&2; exit 1; }
+
+usage() {
+  cat <<'USAGE'
+Usage: install [--version X] [--modify-path] [--help]
+
+Environment: CREWCODE_REPO, CREWCODE_VERSION, CREWCODE_INSTALL_DIR, CREWCODE_BASE_URL
+USAGE
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --version) [ $# -ge 2 ] || die "--version needs a value"; VERSION="$2"; shift 2 ;;
+    --modify-path) MODIFY_PATH=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) die "unknown option: $1" ;;
+  esac
+done
+VERSION="${VERSION#v}"
+
+detect_target() {
+  os=$(uname -s)
+  arch=$(uname -m)
+  case "$arch" in
+    x86_64|amd64) arch=x64 ;;
+    aarch64|arm64) arch=arm64 ;;
+    *) die "unsupported architecture: $arch" ;;
+  esac
+  case "$os" in
+    Linux)
+      os=linux
+      if [ -f /etc/alpine-release ] || (ldd --version 2>&1 | grep -qi musl); then
+        die "musl libc (Alpine) has no prebuilt binary yet"
+      fi
+      ;;
+    Darwin)
+      os=darwin
+      # An x64 shell running under Rosetta on Apple Silicon should get the native build.
+      if [ "$arch" = x64 ] && [ "$(sysctl -n sysctl.proc_translated 2>/dev/null || echo 0)" = 1 ]; then
+        arch=arm64
+      fi
+      ;;
+    MINGW*|MSYS*|CYGWIN*) die "on Windows use install.ps1 (PowerShell)" ;;
+    *) die "unsupported operating system: $os" ;;
+  esac
+  TARGET="$os-$arch"
+}
+
+fetch() { # fetch <url> <output file>
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL --retry 3 -o "$2" "$1"
+  elif command -v wget >/dev/null 2>&1; then
+    wget -q -O "$2" "$1"
+  else
+    die "curl or wget is required"
+  fi
+}
+
+sha256_of() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | cut -d ' ' -f 1
+  elif command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1" | cut -d ' ' -f 1
+  elif command -v openssl >/dev/null 2>&1; then
+    openssl dgst -sha256 "$1" | sed 's/^.*= //'
+  else
+    die "sha256sum, shasum or openssl is required to verify the download"
+  fi
+}
+
+release_url() {
+  if [ -n "${CREWCODE_BASE_URL:-}" ]; then
+    printf '%s' "${CREWCODE_BASE_URL%/}"
+  elif [ -n "$VERSION" ]; then
+    printf 'https://github.com/%s/releases/download/v%s' "$CREWCODE_REPO" "$VERSION"
+  else
+    printf 'https://github.com/%s/releases/latest/download' "$CREWCODE_REPO"
+  fi
+}
+
+profile_for_shell() {
+  case "${SHELL:-}" in
+    */zsh) echo "$HOME/.zshrc" ;;
+    */bash) if [ "$(uname -s)" = Darwin ]; then echo "$HOME/.bash_profile"; else echo "$HOME/.bashrc"; fi ;;
+    */fish) echo "$HOME/.config/fish/config.fish" ;;
+    *) echo "$HOME/.profile" ;;
+  esac
+}
+
+path_hint() {
+  profile=$(profile_for_shell)
+  case "$profile" in
+    */config.fish) line="fish_add_path \"$INSTALL_DIR\"" ;;
+    *) line="export PATH=\"$INSTALL_DIR:\$PATH\"" ;;
+  esac
+  if [ "$MODIFY_PATH" = 1 ]; then
+    if grep -qF "$line" "$profile" 2>/dev/null; then
+      say "$INSTALL_DIR is already in $profile"
+    else
+      mkdir -p "$(dirname "$profile")"
+      printf '\n# CrewCode\n%s\n' "$line" >> "$profile"
+      say "Added $INSTALL_DIR to PATH in $profile; restart your shell or run: $line"
+    fi
+  else
+    say "Add it to your PATH:"
+    say "  $line"
+    say "(or re-run the installer with --modify-path to append it to $profile)"
+  fi
+}
+
+detect_target
+FILE="crewcode-$TARGET.tar.gz"
+URL="$(release_url)"
+
+TMP=$(mktemp -d)
+trap 'rm -rf "$TMP"' EXIT INT TERM
+
+say "Installing CrewCode ${VERSION:-latest} for $TARGET"
+fetch "$URL/$FILE" "$TMP/$FILE" || die "download failed: $URL/$FILE"
+fetch "$URL/$FILE.sha256" "$TMP/$FILE.sha256" || die "download failed: $URL/$FILE.sha256"
+
+expected=$(cut -d ' ' -f 1 "$TMP/$FILE.sha256")
+actual=$(sha256_of "$TMP/$FILE")
+[ -n "$expected" ] && [ "$expected" = "$actual" ] || die "checksum mismatch for $FILE (expected $expected, got $actual)"
+
+tar -xzf "$TMP/$FILE" -C "$TMP" crewcode
+[ -f "$TMP/crewcode" ] || die "the archive does not contain a crewcode binary"
+
+mkdir -p "$INSTALL_DIR"
+if [ -x "$INSTALL_DIR/crewcode" ]; then
+  say "Replacing existing install: $("$INSTALL_DIR/crewcode" --version 2>/dev/null || echo unknown version)"
+fi
+# Write next to the target and rename, so a running crewcode is never overwritten in place.
+cp "$TMP/crewcode" "$INSTALL_DIR/crewcode.new"
+chmod 755 "$INSTALL_DIR/crewcode.new"
+mv -f "$INSTALL_DIR/crewcode.new" "$INSTALL_DIR/crewcode"
+
+say "Installed $INSTALL_DIR/crewcode"
+case ":$PATH:" in
+  *":$INSTALL_DIR:"*) say "Run: crewcode" ;;
+  *) path_hint ;;
+esac
