@@ -11,7 +11,6 @@ import { FSUtil } from "@crewcode/core/fs-util"
 import { CrossSpawnSpawner } from "@crewcode/core/cross-spawn-spawner"
 import { Flag } from "@crewcode/core/flag/flag"
 import { createCrewcodeClient } from "@crewcode/sdk/v2"
-import { validateSession } from "../../src/cli/tui/validate-session"
 import { InstanceBootstrap } from "../../src/project/bootstrap"
 import { InstanceStore } from "../../src/project/instance-store"
 import { MessageID, PartID, SessionID } from "../../src/session/schema"
@@ -19,7 +18,6 @@ import { MessageV2 } from "../../src/session/message-v2"
 
 import type { Config } from "@/config/config"
 import { Session as SessionNs } from "@/session/session"
-import { errorMessage } from "../../src/util/error"
 import { TestLLMServer } from "../lib/llm-server"
 import path from "path"
 import { resetDatabase } from "../fixture/db"
@@ -465,25 +463,6 @@ describe("HttpApi SDK", () => {
           error: missing.error,
           thrown,
         }
-      }),
-    ),
-  )
-
-  serverPathParity("formats missing session validation errors for -s", (serverPath) =>
-    withStandardProject(serverPath, ({ directory }) =>
-      Effect.gen(function* () {
-        const sessionID = "ses_206f84f18ffeZ6hhD7pFYAiW5T"
-        const fetch = yield* serverFetch(serverPath)
-        const thrown = yield* captureThrown(() =>
-          validateSession({
-            url: "http://localhost",
-            directory,
-            sessionID,
-            fetch,
-          }),
-        )
-        expect(errorMessage(thrown)).toBe(`Session not found: ${sessionID}`)
-        return errorMessage(thrown)
       }),
     ),
   )

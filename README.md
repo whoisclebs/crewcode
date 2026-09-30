@@ -26,9 +26,9 @@ You need `bun` (the version in `package.json`), `git` and `rg`.
 
 ```sh
 export OPENROUTER_API_KEY=sk-or-...           # or OPENAI_API_KEY, or: crewcode providers login
-crewcode                                       # the TUI
+crewcode                                       # the interface (Rust binary in packages/tui-rs)
 crewcode run -m openrouter/openai/gpt-5.4-mini "explain this repository" < /dev/null
-crewcode --auto                                # TUI with contextual review of actions that need approval
+crewcode --auto                                # interface with contextual review of actions that need approval
 crewcode audit stats                           # what the reviewer decided and how many false approvals
 ```
 
@@ -49,8 +49,6 @@ An OpenAI-compatible provider, for example a local Ollama:
 ```
 
 `crewcode run` reads `stdin` when it is not a terminal (so that `cat file | crewcode run "..."` works). In scripts with no input, use `< /dev/null`.
-
-There is no syntax highlighting by default: no parser is bundled in the repository. To turn it on, run `bun run --cwd packages/tui setup:parsers` once. It is the only step that downloads anything, and only when you ask for it.
 
 Prompt caching: providers that cache on their own (OpenAI, DeepSeek, Groq, Grok, Moonshot, Z.AI) need nothing. CrewCode marks cache breakpoints (`cache_control`) for Claude models on any provider, and for Qwen and Gemini on OpenRouter, and it sends `X-Session-Id` so OpenRouter keeps a conversation on the same backend. For a custom endpoint that serves a Claude model under another name, set `"setCacheControl": true` in that provider's `options`.
 
