@@ -16,11 +16,8 @@ import { StatsCommand } from "./cli/cmd/stats"
 import { McpCommand } from "./cli/cmd/mcp"
 import { ExportCommand } from "./cli/cmd/export"
 import { ImportCommand } from "./cli/cmd/import"
-import { AttachCommand } from "./cli/cmd/attach"
-import { TuiThreadCommand } from "./cli/cmd/tui"
 import { AcpCommand } from "./cli/cmd/acp"
 import { EOL } from "os"
-import { PrCommand } from "./cli/cmd/pr"
 import { SessionCommand } from "./cli/cmd/session"
 import { DbCommand } from "./cli/cmd/db"
 import { errorMessage } from "./util/error"
@@ -100,8 +97,6 @@ const cli = yargs(args)
   .completion("completion", "generate shell completion script")
   .command(AcpCommand)
   .command(McpCommand)
-  .command(TuiThreadCommand)
-  .command(AttachCommand)
   .command(RunCommand)
   .command(GenerateCommand)
   .command(DebugCommand)
@@ -112,7 +107,6 @@ const cli = yargs(args)
   .command(StatsCommand)
   .command(ExportCommand)
   .command(ImportCommand)
-  .command(PrCommand)
   .command(SessionCommand)
   .command(DbCommand)
   .command(AuditCommand)
@@ -131,8 +125,9 @@ const cli = yargs(args)
   .strict()
 
 try {
-  if (args.includes("-h") || args.includes("--help")) {
-    await cli.parse(args, (err: Error | undefined, _argv: unknown, out: string) => {
+  // The interactive UI is the Rust binary in packages/tui-rs; with no arguments the core prints help.
+  if (args.length === 0 || args.includes("-h") || args.includes("--help")) {
+    await cli.parse(args.length === 0 ? ["--help"] : args, (err: Error | undefined, _argv: unknown, out: string) => {
       if (err) throw err
       if (!out) return
       show(out)

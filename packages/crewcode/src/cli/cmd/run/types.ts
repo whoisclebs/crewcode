@@ -1,18 +1,6 @@
-// Shared type vocabulary for the direct interactive mode (`crewcode --mini`).
-//
-// Direct mode uses a split-footer terminal layout: immutable scrollback for the
-// session transcript, and a mutable footer for prompt input, status, and
-// permission/question UI. Every module in run/* shares these types to stay
-// aligned on that two-lane model.
-//
-// Data flow through the system:
-//
-//   SDK events → session-data reducer → StreamCommit[] + FooterOutput
-//     → stream.ts bridges to footer API
-//       → footer.ts queues commits and patches the footer view
-//         → OpenTUI split-footer renderer writes to terminal
+// Types shared by the formatting helpers of `crewcode run` (see tool.ts).
+
 import type { CrewcodeClient, PermissionRequest, QuestionRequest, ToolPart } from "@crewcode/sdk/v2"
-import type { TuiConfig } from "@crewcode/tui/config"
 
 export type RunFilePart = {
   type: "file"
@@ -286,7 +274,6 @@ export type QuestionReply = Parameters<CrewcodeClient["question"]["reply"]>[0]
 
 export type QuestionReject = Parameters<CrewcodeClient["question"]["reject"]>[0]
 
-export type RunTuiConfig = Pick<TuiConfig.Resolved, "keybinds" | "leader_timeout" | "diff_style">
 
 // Lifecycle phase of a scrollback entry. "start" opens the entry, "progress"
 // appends content (coalesced in the footer queue), "final" closes it.

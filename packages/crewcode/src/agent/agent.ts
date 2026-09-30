@@ -118,6 +118,9 @@ const layer = Layer.effect(
 
         const defaults = Permission.fromConfig({
           "*": "allow",
+          // Anything that changes files or runs commands needs approval, so manual mode has something to ask about.
+          edit: "ask",
+          bash: "ask",
           doom_loop: "ask",
           external_directory: {
             "*": "ask",
