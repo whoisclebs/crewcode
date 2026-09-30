@@ -3,14 +3,12 @@
 import { $ } from "bun"
 import path from "path"
 import { fileURLToPath } from "url"
-import { createSolidTransformPlugin } from "@opentui/solid/bun-plugin"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const dir = path.resolve(__dirname, "..")
 
 process.chdir(dir)
-
 
 import { Script } from "@crewcode/script"
 import pkg from "../package.json"
@@ -19,9 +17,6 @@ const singleFlag = process.argv.includes("--single")
 const baselineFlag = process.argv.includes("--baseline")
 const skipInstall = process.argv.includes("--skip-install")
 const sourcemapsFlag = process.argv.includes("--sourcemaps")
-const plugin = createSolidTransformPlugin()
-
-const treeSitterWorker = await Bun.file(fileURLToPath(import.meta.resolve("@opentui/core/parser.worker"))).text()
 
 const allTargets: {
   os: string
@@ -111,7 +106,6 @@ await $`rm -rf dist`
 
 const binaries: Record<string, string> = {}
 if (!skipInstall) {
-  await $`bun install --os="*" --cpu="*" @opentui/core@${pkg.dependencies["@opentui/core"]}`
   await $`bun install --os="*" --cpu="*" @parcel/watcher@${pkg.dependencies["@parcel/watcher"]}`
   await $`bun install --os="*" --cpu="*" @ff-labs/fff-bun@${pkg.dependencies["@ff-labs/fff-bun"]}`
 }
@@ -129,14 +123,9 @@ for (const item of targets) {
   console.log(`building ${name}`)
   await $`mkdir -p dist/${name}/bin`
 
-  const workerPath = "./src/cli/tui/worker.ts"
-  const treeSitterWorkerPath = "opentui-tree-sitter-worker.js"
-  const bunfsRoot = item.os === "win32" ? "B:/~BUN/root/" : "/$bunfs/root/"
-
   await Bun.build({
     conditions: ["bun", "node"],
     tsconfig: "./tsconfig.json",
-    plugins: [plugin],
     external: ["node-gyp"],
     format: "esm",
     minify: true,
@@ -152,18 +141,12 @@ for (const item of targets) {
       execArgv: [`--user-agent=crewcode/${Script.version}`, "--use-system-ca", "--"],
       windows: {},
     },
-    files: {
-      [treeSitterWorkerPath]: treeSitterWorker,
-    },
-    entrypoints: ["./src/index.ts", workerPath, treeSitterWorkerPath],
+    entrypoints: ["./src/index.ts"],
     define: {
       FFF_LIBC: JSON.stringify(item.abi === "musl" ? "musl" : "gnu"),
       CREWCODE_VERSION: `'${Script.version}'`,
-      OTUI_TREE_SITTER_WORKER_PATH: bunfsRoot + treeSitterWorkerPath,
-      CREWCODE_WORKER_PATH: workerPath,
       CREWCODE_CHANNEL: `'${Script.channel}'`,
       CREWCODE_LIBC: item.os === "linux" ? `'${item.abi ?? "glibc"}'` : "",
-      ...(item.os === "linux" ? { "process.env.OPENTUI_LIBC": JSON.stringify(item.abi ?? "glibc") } : {}),
     },
   })
 
@@ -180,7 +163,6 @@ for (const item of targets) {
     }
   }
 
-  await $`rm -rf ./dist/${name}/bin/tui`
   await Bun.file(`dist/${name}/package.json`).write(
     JSON.stringify(
       {

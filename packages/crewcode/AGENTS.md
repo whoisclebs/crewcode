@@ -7,10 +7,8 @@
 
 ## Development server
 
-- Running `bun dev` from `packages/crewcode` starts the live interactive TUI. Do not run it as a blocking foreground command when you need to inspect the result.
-- Start it in `tmux` instead: `tmux new-session -d -s crewcode-dev 'bun dev'`.
-- Capture the current TUI output with: `tmux capture-pane -pt crewcode-dev`.
-- Stop the session explicitly when done: `tmux kill-session -t crewcode-dev`.
+- This package is the headless core (server and non-interactive commands). The interactive interface is the Rust binary in `packages/tui-rs`, which starts the core with `serve --port 0` and talks to it over HTTP and SSE.
+- Running `bun dev` from `packages/crewcode` prints help. Use `bun dev serve --port 4110` for a server or `bun dev run "message"` for a one-shot run.
 
 # Module shape
 
