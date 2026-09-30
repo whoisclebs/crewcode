@@ -3,8 +3,18 @@
   "version": "{{version}}",
   "description": "The CrewCode binary for {{name}}. Install `crewcode` instead of this package.",
   "license": "MIT",
-  "os": ["{{os}}"],
-  "cpu": ["{{cpu}}"],
-  "files": ["bin/"],
-  "preferUnplugged": true
+  "os": [
+    "{{os}}"
+  ],
+  "cpu": [
+    "{{cpu}}"
+  ],
+  "files": [
+    "bin/"
+  ],
+  "preferUnplugged": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/whoisclebs/crewcode.git"
+  }
 }

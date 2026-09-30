@@ -27,5 +27,10 @@
     "crewcode-linux-arm64": "0.0.0",
     "crewcode-linux-x64": "0.0.0",
     "crewcode-windows-x64": "0.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/whoisclebs/crewcode.git",
+    "directory": "packages/npm/crewcode"
   }
 }
